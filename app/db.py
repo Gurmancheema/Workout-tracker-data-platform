@@ -99,6 +99,39 @@ def create_exercises_sets(workout_exercises_id,set_number,reps,weight,duration_s
 
     return set_id
 
+# the "set_number" attribute shall increment automatically when a user clicks on "add set" button
+# also when a user deletes or edits the wrongfully input "set_number", the set_number must fall back to 
+# latest lowest number to preserve the incremental count
+# therefore, defining a function that keeps track of "set_number" in "exercises_sets" table
+
+def get_set_number(workout_exercises_id):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""SELECT set_number 
+                FROM workout.exercises_sets
+                WHERE workout_exercises_id = %s
+                ORDER BY set_number;""", (workout_exercises_id,))
+    
+    rows = cur.fetchall()
+
+    all_set_numbers_particular_to_workout_session = [row[0] for row in rows]
+
+    cur.close()
+    conn.close()
+
+    next_set_num = 1
+
+    for num in all_set_numbers_particular_to_workout_session:
+        if num == next_set_num:
+            next_set_num += 1
+        else:
+            break
+
+    return next_set_num
+
+
+
 # since the order of exercises performed must be incremented automatically each time user completes one exercise
 # therefore, creating a function that fetches the latest count of "exercise_order" in "workout_exercises" table
 # and increments it whenever the user adds a new exercise
@@ -126,6 +159,7 @@ def get_whole_workout_session(workout_session_id):
 
     cur.execute("""SELECT e.exercise_id,e.exercise_name,e.muscle_group,
                 we.exercise_order,
+                es.set_id,
                 es.set_number,
                 es.reps,
                 es.weight FROM workout.workout_exercises we
@@ -140,3 +174,17 @@ def get_whole_workout_session(workout_session_id):
     cur.close()
 
     return resulting_rows
+
+# now a user can accidentally input the wrong information of sets, reps or weights
+# therefore, creating a "delete_set" function to provide editing features to the user
+
+def delete_set(set_id):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(""" DELETE FROM workout.exercises_sets 
+                    WHERE set_id = %s;""",(set_id,))
+    
+    conn.commit()
+    cur.close
+    conn.close()

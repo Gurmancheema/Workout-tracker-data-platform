@@ -132,7 +132,6 @@ with center:
                 exercise_id,
                 exercise_order
             )
-            st.session_state["set_number"] = 1
             st.success(f"Exercise added! ID: {workout_exercises_id}")
             st.session_state["workout_exercises_id"] = workout_exercises_id
 
@@ -144,16 +143,21 @@ with center:
     st.divider()
     st.markdown("### 🏋️ Add Sets")
 
-    col8,col4, col5, col6 = st.columns([1,1, 1, 1])
+    col8,col4, col5, col6 = st.columns([1, 1, 1, 1])
     col8.markdown("**Set Number**")
     col4.markdown("**Reps**")
     col5.markdown("**Weight**")
     col6.markdown("**Duration**")
-    #col4.markdown("**Action**")
 
-    set_number = st.session_state["set_number"]
+    from db import get_set_number
+    workout_exercises_id = st.session_state.get("workout_exercises_id")
+
+    if workout_exercises_id is None:
+        st.error("Please add an exercise first")
+        st.stop()
+    set_number = get_set_number(workout_exercises_id)
     with col8:
-        st.write(f"{st.session_state['set_number']}")
+        st.markdown(f"**{set_number}**")
 
     # handling the reset for user inputs before the widgets are created
     # streamlit behaviour => Update session_state → THEN rerun → THEN UI reflects change
@@ -197,10 +201,7 @@ with center:
             )
 
             # display the success message for added set
-            st.session_state["success_message"] = f"Set {st.session_state['set_number']} added!"
-
-            # increment the set number
-            st.session_state["set_number"] += 1
+            st.session_state["success_message"] = f"Set {set_number} added!"
 
             # reset the inputs flag trigger
             st.session_state["reset_inputs"] = True
@@ -210,7 +211,7 @@ st.divider()
 
 
 
-st.markdown("###                 📊 Workout Progress")
+st.markdown("### 📊 Workout Progress")
 from db import get_whole_workout_session
 
 from collections import defaultdict
@@ -229,7 +230,103 @@ if workout_session_id:
 
         st.markdown(f"### {order}. {name} ({muscle})")
 
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+
+        col1.markdown("**Set**")
+        col2.markdown("**Reps**")
+        col3.markdown("**Weight**")
+        col4.markdown("**Action**")
+
         for s in sets:
-            st.write(
-                f"Set {s[4]} | Reps: {s[5]} | Weight: {s[6]}"
-        )
+            (we_id,
+            name,
+            muscle,
+            order,
+            set_id,
+            set_number,
+            reps,
+            weight
+        ) = s
+            col1, col2, col3, col4= st.columns([1, 1, 1, 1])
+
+            with col1:
+                st.markdown(f"{set_number}")
+
+            with col2:
+                st.markdown(f"{reps}")
+
+            with col3:
+                st.markdown(f"{weight}")
+            
+            with col4:
+                if st.button("🗑️",key=f"delete_{set_id}"):
+
+                    #import delete_set function from DB
+
+                    from db import delete_set
+                    delete_set(set_id)
+                    st.rerun()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# creating a close workout session button when the user is finished with his workout
+
+st.divider()
+
+with center:
+    col1,col2,col3 = st.columns([2,2,2])
+
+    with col2:
+        finish_button = st.button("🏁 Finish Workout", use_container_width=True)
+
+    # now if the button is clicked, user must see a warning prompt before closing the session
+
+    if finish_button:
+        st.session_state["confirm_finish_workout"] = True
+
+    if st.session_state.get("confirm_finish_workout"):
+
+        # prompt warning message
+        st.warning("Are you sure you want to finish the workout?")
+
+        col1,col2 = st.columns(2)
+
+        with col1:
+            if st.button("✅ Yes, Finish"):
+                 #CLEAR STATE
+                keys_to_clear = [
+                    "workout_session_id",
+                    "workout_exercises_id",
+                    "set_number"
+                ]
+
+                for key in keys_to_clear:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                
+                # after resetting keys again set the confirm_finish_session state to False
+                st.session_state["confirm_finish_workout"] = False
+
+                st.success("Workout Finished")
+                st.rerun()
+
+        with col2:
+            if st.button("❌ No, Cancel"):
+                st.session_state["confirm_finish_workout"] = False
+                st.rerun()
