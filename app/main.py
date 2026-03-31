@@ -3,7 +3,7 @@
 
 import streamlit as st
 print(st.__version__)
-
+from datetime import date
 # hard-coding front end to get basic user inputs required to Start a workout session
 st.set_page_config(
     page_title="Workout Tracker",
@@ -30,9 +30,17 @@ with center:
     col3.markdown("**Duration**")
 #col4.markdown("**Duration (min)**")
 #col5.markdown("**Action**")
+if "reset_form" not in st.session_state:
+    st.session_state["reset_form"] = False
+if st.session_state["reset_form"]:
+    st.session_state["user_name"] = ""
+    st.session_state["workout_date"] = date.today()
+    st.session_state["workout_duration"] = 10  # respect min_value
+    st.session_state["select_exercise"] = "Select Exercise"
 
+    st.session_state["reset_form"] = False
 # defining column placeholders
-
+with center:
     with col1:
         user_name = st.text_input("Username",key="user_name",label_visibility="collapsed")
 
@@ -100,7 +108,7 @@ with center:
 
     with col7[0]:
         selected_exercise = st.selectbox("Select Exercise",options, format_func= lambda x: "Select an exercise" if x is None else x
-                                    ,label_visibility="collapsed")
+                                    ,label_visibility="collapsed",key="select_exercise")
 
 
 
@@ -317,8 +325,10 @@ with center:
                 ]
 
                 for key in keys_to_clear:
-                    if key in st.session_state:
-                        del st.session_state[key]
+                    st.session_state.pop(key,None)
+                
+                # Trigger reset instead of direct clearing
+                st.session_state["reset_form"] = True
                 
                 # after resetting keys again set the confirm_finish_session state to False
                 st.session_state["confirm_finish_workout"] = False
