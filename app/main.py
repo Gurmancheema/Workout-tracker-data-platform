@@ -12,24 +12,139 @@ st.set_page_config(
     )
 left, center, right = st.columns([1, 3, 1])
 
+# ********* NOTIFICATIONS SECTION *************
+
+if st.session_state.get("workout_finished"):
+    st.success("Workout finished successfully!")
+    st.session_state["workout_finished"] = False
+
+# ******* Priority-based UI rendering ***********
+
+def render_history_ui():
+    with center:
+        st.subheader("Workout History")
+
+        user_name_input = st.text_input("Enter username",key="history_username")
+        past_workout_date_input = st.date_input("Select workout day",key="history_date")
+        
+        if st.button("Fetch Workout"):
+            from db import get_user_id
+            related_user_id = get_user_id(user_name_input)
+
+            from db import fetch_historical_workout_data
+            hist_data = fetch_historical_workout_data(
+                related_user_id,
+                past_workout_date_input
+            )
+
+            st.write(hist_data)
+
+        if st.button("⬅ Back"):
+            st.session_state["show_history"] = False
+            st.rerun()
+
+
+if st.session_state.get("show_workout_history"):
+    render_history_ui()   # we'll define this
+
+
+#elif st.session_state.get("show_signup"):
+    #render_signup_ui()
+
+#else:
+    #render_workout_ui()
+
 with center:
     st.markdown("## 💪 Workout Tracker")
     st.caption("Track your workouts efficiently")
 
     st.markdown("### 🏁 Start Workout")
 
-# for columnar format on page
-# let's fetch values from user on same page without letting the user to scroll down
+if "show_signup" not in st.session_state:
+    st.session_state["show_signup"] = False
 
-#defining column ratios
+with right:    
+    col_left , col_right = st.columns([2,3])
+
+with col_right:
+    if st.button("Sign Up"):
+        st.session_state["show_signup"] = True
+# now if the user click on "sign up" button
+# then the session state becomes true
+# therefore, further creating web form to appear
+
+# creating function to check that either of entered credentials are not left empty
+from db import create_new_user
+import psycopg2
+from psycopg2 import errors
+def check_credentials_and_insert(name,email_id):
+    if not name or not email_id:
+        st.error("All fields are required")
+        return
+    
+    try:
+        create_new_user(name.strip(),email_id.strip())
+        st.success("User profile created")
+
+        # reset the fields now
+        st.session_state["show_signup"] = False
+
+        return
+
+    except psycopg2.Error as e:
+
+        if isinstance(e, psycopg2.errors.UniqueViolation):
+            constraint = e.diag.constraint_name
+
+            if "name" in constraint:
+                st.error("Username already exists")
+            elif "email" in constraint:
+                st.error("Email already exists")
+        else:
+            st.error("Something went wrong")
+    return
+with center:
+    if st.session_state["show_signup"]:
+        st.subheader("Create new user")
+
+        signup_name = st.text_input("Enter the username",key="signup_name")
+        signup_email = st.text_input("Enter the email",key='signup_email')
+
+        col1,col2 = st.columns(2)
+
+        # creating buttons and defining their actions
+        with col1:
+            if st.button("Create Account"):
+                check_credentials_and_insert(signup_name,signup_email)
+        
+        with col2:
+            if st.button("Cancel"):
+                st.session_state["show_signup"] = False
+                st.rerun()
+    
+# creating ""Workout history" feature just below the "Sign Up" button
+
+with right:
+    col_left,col_right = st.columns([2,3])
+
+    with col_right:
+        if st.button("View Workout History"):
+            st.session_state["show_history"] = True
+
+            if st.session_state.get("show_history"):
+                render_history_ui()
+                st.stop()
+
+# defining column ratios
+with center:
     col1, col2, col3 = st.columns([2, 2, 1.5])
 
-# creating column labels
+    # creating column labels
     col1.markdown("**User**")
     col2.markdown("**Date**")
     col3.markdown("**Duration**")
-#col4.markdown("**Duration (min)**")
-#col5.markdown("**Action**")
+    #col4.markdown("**Duration (min)**")
+    #col5.markdown("**Action**")
 if "reset_form" not in st.session_state:
     st.session_state["reset_form"] = False
 if st.session_state["reset_form"]:
@@ -48,7 +163,7 @@ with center:
         workout_date_input = st.date_input("Workout Date",key="workout_date",label_visibility="collapsed")
 
     with col3:
-        duration_input = st.number_input("Workout Duration",min_value=10,step=1,key="workout_duration",label_visibility="collapsed")
+        duration_input = st.number_input("Workout Duration",min_value=10,max_value=120,step=1,key="workout_duration",label_visibility="collapsed")
 
 # creating a session state to hold the values of some variables
 # that are required throughout the environment
@@ -109,8 +224,6 @@ with center:
     with col7[0]:
         selected_exercise = st.selectbox("Select Exercise",options, format_func= lambda x: "Select an exercise" if x is None else x
                                     ,label_visibility="collapsed",key="select_exercise")
-
-
 
 
 
@@ -281,18 +394,6 @@ if workout_session_id:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 # creating a close workout session button when the user is finished with his workout
 
 st.divider()
@@ -315,6 +416,7 @@ with center:
 
         col1,col2 = st.columns(2)
 
+
         with col1:
             if st.button("✅ Yes, Finish"):
                  #CLEAR STATE
@@ -329,12 +431,14 @@ with center:
                 
                 # Trigger reset instead of direct clearing
                 st.session_state["reset_form"] = True
+
+                
                 
                 # after resetting keys again set the confirm_finish_session state to False
                 st.session_state["confirm_finish_workout"] = False
-
-                st.success("Workout Finished")
+                st.session_state["workout_finished"] = True
                 st.rerun()
+
 
         with col2:
             if st.button("❌ No, Cancel"):

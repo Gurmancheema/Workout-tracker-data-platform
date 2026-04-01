@@ -12,6 +12,22 @@ def get_connection():
         password = 'password'
 )
 
+# creating a function that creates a new user
+# will add a "sign-up" button to create the new user
+
+def create_new_user(name,email_id):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(""" INSERT INTO workout.users (name,email_id) VALUES
+                (%s,%s) RETURNING user_id;""",(name,email_id))
+    
+    resulting_user_id = cur.fetchone()
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
 # Creating a function that fetches the "user_id" from "user_name" entered by the user 
 def get_user_id (user_name):
     conn = get_connection()
@@ -187,4 +203,32 @@ def delete_set(set_id):
     
     conn.commit()
     cur.close
+    conn.close()
+
+# Creating a function to fetch the historical data of a user according to the date entered
+# Useful for analytics and progress tracking, user shall access workout performed for each previous date
+
+def fetch_historical_workout_data(user_id,workout_date):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""SELECT e.exercise_name,e.muscle_group,
+                we.exercise_order,
+                we.exercise_id,
+                es.set_number,
+                es.reps,
+                es.weight
+                FROM workout.workout_sessions ws
+                    JOIN workout.workout_exercises we
+                        ON ws.workout_session_id = we.workout_session_id
+                    JOIN workout.exercises e
+                        ON e.exercise_id = we.exercise_id
+                JOIN workout.exercises_sets es
+                    ON es.workout_exercises_id = we.workout_exercises_id
+                WHERE ws.user_id = %s 
+                    AND 
+                    ws.workout_date = %s
+                ORDER BY we.exercise_order;""",(user_id,workout_date))
+    
+    cur.close()
     conn.close()
