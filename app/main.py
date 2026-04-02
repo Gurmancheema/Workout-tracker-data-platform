@@ -19,9 +19,17 @@ if st.session_state.get("workout_finished"):
     st.session_state["workout_finished"] = False
 
 # ******* Priority-based UI rendering ***********
+if "show_signup" not in st.session_state:
+    st.session_state["show_signup"] = False
+
+if "show_history" not in st.session_state:
+    st.session_state["show_history"] = False
+
 
 def render_history_ui():
     with center:
+        st.markdown("## 💪 Workout Tracker")
+        st.caption("Track your workouts efficiently")
         st.subheader("Workout History")
 
         user_name_input = st.text_input("Enter username",key="history_username")
@@ -31,109 +39,141 @@ def render_history_ui():
             from db import get_user_id
             related_user_id = get_user_id(user_name_input)
 
+            # edge case handling if user is not registered
+            if not related_user_id:
+                st.error("user not found")
+                return
+
             from db import fetch_historical_workout_data
             hist_data = fetch_historical_workout_data(
                 related_user_id,
                 past_workout_date_input
             )
 
-            st.write(hist_data)
+            # printing the fetched historical data now
+            current_exercise = None
+
+            for row in hist_data:
+                exercise_name, muscle_group, exercise_order, exercise_id, set_number, reps, weight = row
+
+                # when new exercise starts
+                if exercise_name != current_exercise:
+                    st.markdown("---")
+                    st.markdown(f"### {exercise_order}. 💪 {muscle_group} - {exercise_name}")
+                    current_exercise = exercise_name
+
+                st.write(f"Set {set_number} → {reps} reps | {weight} kg")
+
+            st.markdown("## 📊 Performance Summary")
+
+            exercise_stats = {}
+
+            for row in hist_data:
+                exercise_name, _, _, _, _, reps, weight = row
+
+                if exercise_name not in exercise_stats:
+                    exercise_stats[exercise_name] = {"max_weight": 0, "max_reps": 0}
+
+                exercise_stats[exercise_name]["max_weight"] = max(
+                    exercise_stats[exercise_name]["max_weight"], weight
+                )
+                exercise_stats[exercise_name]["max_reps"] = max(
+                    exercise_stats[exercise_name]["max_reps"], reps
+                )
+
+            for exercise, stats in exercise_stats.items():
+                st.write(
+                    f"{exercise} → Max Weight: {stats['max_weight']} kg | Max Reps: {stats['max_reps']}"
+                )
 
         if st.button("⬅ Back"):
             st.session_state["show_history"] = False
             st.rerun()
-
-
-if st.session_state.get("show_workout_history"):
-    render_history_ui()   # we'll define this
-
-
-#elif st.session_state.get("show_signup"):
-    #render_signup_ui()
-
-#else:
-    #render_workout_ui()
-
-with center:
-    st.markdown("## 💪 Workout Tracker")
-    st.caption("Track your workouts efficiently")
-
-    st.markdown("### 🏁 Start Workout")
-
-if "show_signup" not in st.session_state:
-    st.session_state["show_signup"] = False
-
-with right:    
-    col_left , col_right = st.columns([2,3])
-
-with col_right:
-    if st.button("Sign Up"):
-        st.session_state["show_signup"] = True
+            
 # now if the user click on "sign up" button
 # then the session state becomes true
 # therefore, further creating web form to appear
 
-# creating function to check that either of entered credentials are not left empty
-from db import create_new_user
-import psycopg2
-from psycopg2 import errors
-def check_credentials_and_insert(name,email_id):
-    if not name or not email_id:
-        st.error("All fields are required")
-        return
-    
-    try:
-        create_new_user(name.strip(),email_id.strip())
-        st.success("User profile created")
 
-        # reset the fields now
-        st.session_state["show_signup"] = False
+def render_signup_ui():
+    from db import create_new_user
+    import psycopg2
+    from psycopg2 import errors
 
-        return
+    # creating function to check that either of entered credentials are not left empty
 
-    except psycopg2.Error as e:
-
-        if isinstance(e, psycopg2.errors.UniqueViolation):
-            constraint = e.diag.constraint_name
-
-            if "name" in constraint:
-                st.error("Username already exists")
-            elif "email" in constraint:
-                st.error("Email already exists")
-        else:
-            st.error("Something went wrong")
-    return
-with center:
-    if st.session_state["show_signup"]:
-        st.subheader("Create new user")
-
-        signup_name = st.text_input("Enter the username",key="signup_name")
-        signup_email = st.text_input("Enter the email",key='signup_email')
-
-        col1,col2 = st.columns(2)
-
-        # creating buttons and defining their actions
-        with col1:
-            if st.button("Create Account"):
-                check_credentials_and_insert(signup_name,signup_email)
+    def check_credentials_and_insert(name,email_id):
+        if not name or not email_id:
+            st.error("All fields are required")
+            return
         
-        with col2:
-            if st.button("Cancel"):
-                st.session_state["show_signup"] = False
-                st.rerun()
-    
-# creating ""Workout history" feature just below the "Sign Up" button
+        try:
+            create_new_user(name.strip(),email_id.strip())
+            st.success("User profile created")
 
-with right:
-    col_left,col_right = st.columns([2,3])
+            # reset the fields now
+            st.session_state["show_signup"] = False
 
-    with col_right:
-        if st.button("View Workout History"):
-            st.session_state["show_history"] = True
+            return
 
-            if st.session_state.get("show_history"):
-                render_history_ui()
-                st.stop()
+        except psycopg2.Error as e:
+
+            if isinstance(e, psycopg2.errors.UniqueViolation):
+                constraint = e.diag.constraint_name
+
+                if "name" in constraint:
+                    st.error("Username already exists")
+                elif "email" in constraint:
+                    st.error("Email already exists")
+            else:
+                st.error("Something went wrong")
+        return
+    with center:
+        if st.session_state["show_signup"]:
+            st.markdown("## 💪 Workout Tracker")
+            st.caption("Track your workouts efficiently")
+            st.subheader("Create new user")
+
+            signup_name = st.text_input("Enter the username",key="signup_name")
+            signup_email = st.text_input("Enter the email",key='signup_email')
+
+            col1,col2 = st.columns(2)
+
+            # creating buttons and defining their actions
+            with col1:
+                if st.button("Create Account"):
+                    check_credentials_and_insert(signup_name,signup_email)
+            
+            with col2:
+                if st.button("Cancel"):
+                    st.session_state["show_signup"] = False
+                    st.rerun()
+
+
+with right:    
+    col_left , col_right = st.columns([2,3])
+
+# Feature buttons working
+with col_right:
+    if st.button("Sign Up"):
+        st.session_state["show_signup"] = True
+    if st.button("View Workout History"):
+        st.session_state["show_history"] = True
+
+if st.session_state.get("show_history"):
+    render_history_ui()
+    st.stop()
+
+if st.session_state.get("show_signup"):
+    render_signup_ui()
+    st.stop()
+
+
+with center:
+    st.markdown("## 💪 Workout Tracker")
+    st.caption("Track your workouts efficiently")
+    st.markdown("### 🏁 Start Workout")
+
 
 # defining column ratios
 with center:

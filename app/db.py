@@ -230,5 +230,8 @@ def fetch_historical_workout_data(user_id,workout_date):
                     ws.workout_date = %s
                 ORDER BY we.exercise_order;""",(user_id,workout_date))
     
+    resulting_historical_data = cur.fetchall()
     cur.close()
     conn.close()
+
+    return resulting_historical_data
