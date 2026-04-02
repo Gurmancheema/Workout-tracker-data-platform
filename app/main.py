@@ -1,10 +1,11 @@
 # working on front-end now , since i decided to use streamlit therefore
-# creating an instance & importing from it
-
+# Importing streamlit & necessary python packages
 import streamlit as st
 print(st.__version__)
 from datetime import date
-# hard-coding front end to get basic user inputs required to Start a workout session
+
+
+# setting page configuration
 st.set_page_config(
     page_title="Workout Tracker",
     page_icon="💪",
@@ -18,13 +19,16 @@ if st.session_state.get("workout_finished"):
     st.success("Workout finished successfully!")
     st.session_state["workout_finished"] = False
 
-# ******* Priority-based UI rendering ***********
+# ******* UI RENDERING STATES ***********
 if "show_signup" not in st.session_state:
     st.session_state["show_signup"] = False
 
 if "show_history" not in st.session_state:
     st.session_state["show_history"] = False
 
+# ************ RENDER FUNCTIONS DEFINITIONS ********************
+
+# 1. RENDER WORKOUT HISTORY
 
 def render_history_ui():
     with center:
@@ -41,7 +45,7 @@ def render_history_ui():
 
             # edge case handling if user is not registered
             if not related_user_id:
-                st.error("user not found")
+                st.error("User not found!")
                 return
 
             from db import fetch_historical_workout_data
@@ -89,11 +93,9 @@ def render_history_ui():
         if st.button("⬅ Back"):
             st.session_state["show_history"] = False
             st.rerun()
-            
-# now if the user click on "sign up" button
-# then the session state becomes true
-# therefore, further creating web form to appear
 
+
+ # 2. RENDER SIGN UP 
 
 def render_signup_ui():
     from db import create_new_user
@@ -128,6 +130,8 @@ def render_signup_ui():
             else:
                 st.error("Something went wrong")
         return
+    
+    # Enter new user details
     with center:
         if st.session_state["show_signup"]:
             st.markdown("## 💪 Workout Tracker")
@@ -149,17 +153,18 @@ def render_signup_ui():
                     st.session_state["show_signup"] = False
                     st.rerun()
 
-
+# Aligning configurations for feature buttons
 with right:    
-    col_left , col_right = st.columns([2,3])
+    col_left , col_right = st.columns([2,5])
 
 # Feature buttons working
 with col_right:
     if st.button("Sign Up"):
         st.session_state["show_signup"] = True
-    if st.button("View Workout History"):
+    if st.button("Workout History"):
         st.session_state["show_history"] = True
 
+# Render functions flag
 if st.session_state.get("show_history"):
     render_history_ui()
     st.stop()
@@ -168,6 +173,7 @@ if st.session_state.get("show_signup"):
     render_signup_ui()
     st.stop()
 
+ # **************** Main UI TO TRACK WORKOUT *****************************
 
 with center:
     st.markdown("## 💪 Workout Tracker")
@@ -182,11 +188,11 @@ with center:
     # creating column labels
     col1.markdown("**User**")
     col2.markdown("**Date**")
-    col3.markdown("**Duration**")
-    #col4.markdown("**Duration (min)**")
-    #col5.markdown("**Action**")
+    col3.markdown("**Duration (min)**")
+
 if "reset_form" not in st.session_state:
     st.session_state["reset_form"] = False
+
 if st.session_state["reset_form"]:
     st.session_state["user_name"] = ""
     st.session_state["workout_date"] = date.today()
@@ -215,10 +221,7 @@ if "set_number" not in st.session_state:
     st.session_state["set_number"] = 1
 
 
-# fetching user_id from the entered username from  the "users" table
-from db import get_user_id
 
-user_id_input = get_user_id(user_name)
 
 # since now we have our user fetched from DB, let's fetch the function from DB that will store
 # workout session details
@@ -227,6 +230,14 @@ from db import create_workout_session
 
 with center:
     if st.button("Start Workout"):
+        # fetching user_id from the entered username from  the "users" table
+        from db import get_user_id
+        # checking empty or null value for username
+        if not user_name:
+            st.error("Username cannot be null")
+            st.stop()
+        user_id_input = get_user_id(user_name)
+        
         workout_session_id = create_workout_session(user_id_input,workout_date_input,duration_input)
         st.success(f"Workout Session Created,{workout_session_id}")
         st.session_state["workout_session_id"] = workout_session_id
@@ -269,9 +280,9 @@ with center:
 
 with center:
     if st.button("Add Exercise"):
-        workout_session_id = st.session_state["workout_session_id"]
+        workout_session_id = st.session_state.get("workout_session_id")
         if workout_session_id is None:
-            st.warning("Please add workout session details")
+            st.warning("No active workout session")
         else:
             # adding a warning
             if selected_exercise is None:
@@ -449,38 +460,73 @@ with center:
     if finish_button:
         st.session_state["confirm_finish_workout"] = True
 
-    if st.session_state.get("confirm_finish_workout"):
+        # check for added sets before finishing the workout
+        from db import get_total_sets_per_workout_session
+        total_sets = get_total_sets_per_workout_session(workout_session_id)
 
-        # prompt warning message
-        st.warning("Are you sure you want to finish the workout?")
+        st.write(total_sets)
 
-        col1,col2 = st.columns(2)
+        if total_sets == 0:
+            st.warning("⚠️ No sets added.")
+            st.session_state["show_discard_options"] = True
 
+        if total_sets > 0 :
+            # prompt warning message
+            st.warning("Are you sure you want to finish the workout?")
+
+            col1,col2 = st.columns(2)
+
+
+            with col1:
+                if st.button("✅ Yes, Finish"):
+                    #CLEAR STATE
+                    keys_to_clear = [
+                        "workout_session_id",
+                        "workout_exercises_id",
+                        "set_number"
+                    ]
+
+                    for key in keys_to_clear:
+                        st.session_state.pop(key,None)
+                    
+                    # Trigger reset instead of direct clearing
+                    st.session_state["reset_form"] = True
+
+                    
+                    
+                    # after resetting keys again set the confirm_finish_session state to False
+                    st.session_state["confirm_finish_workout"] = False
+                    st.session_state["workout_finished"] = True
+                    st.rerun()
+
+
+            with col2:
+                if st.button("❌ No, Cancel"):
+                    st.session_state["confirm_finish_workout"] = False
+                    st.rerun()
+    
+    if st.session_state.get("show_discard_options"):
+    # give user a choice here to add set or discard the workout
+        col1, col2 = st.columns(2)
 
         with col1:
-            if st.button("✅ Yes, Finish"):
-                 #CLEAR STATE
+            if st.button("➕ Add Set Instead"):
+                st.info("Please add a set to continue")
+        with col2:
+            if st.button("Discard Workout Instead"):
+                from db import discard_workout
+                workout_session_id = st.session_state.get("workout_session_id")
+                discard_workout(workout_session_id)
+                st.success("Workout discarded")
                 keys_to_clear = [
-                    "workout_session_id",
-                    "workout_exercises_id",
-                    "set_number"
-                ]
+                                    "workout_session_id",
+                                    "workout_exercises_id",
+                                    "set_number"
+                                ]
 
                 for key in keys_to_clear:
-                    st.session_state.pop(key,None)
-                
-                # Trigger reset instead of direct clearing
+                    st.session_state.pop(key, None)
+
+                # Now trigger reset
                 st.session_state["reset_form"] = True
-
-                
-                
-                # after resetting keys again set the confirm_finish_session state to False
-                st.session_state["confirm_finish_workout"] = False
-                st.session_state["workout_finished"] = True
-                st.rerun()
-
-
-        with col2:
-            if st.button("❌ No, Cancel"):
-                st.session_state["confirm_finish_workout"] = False
                 st.rerun()

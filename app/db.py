@@ -191,6 +191,40 @@ def get_whole_workout_session(workout_session_id):
 
     return resulting_rows
 
+# Edge case found that user can end the "workout session" by just adding "exercises" without any "sets"
+# therefore, need a case handler for that; user must've performed atleast 1 set
+# or the "workout session" shall be discarded and each detail entered so far
+# shall be removed from the DB
+
+def get_total_sets_per_workout_session(workout_session_id):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(""" SELECT COUNT(*) 
+                    FROM workout.exercises_sets es
+                    JOIN workout.workout_exercises we
+                        ON es.workout_exercises_id = we.workout_exercises_id
+                    WHERE we.workout_session_id = %s""",(workout_session_id,) )
+    
+    total_sets = cur.fetchone()[0]
+    cur.close()
+    conn.close()
+
+    return total_sets
+
+# since dual functionality is being offered to user whether to add sets or discard workout
+# therefore, creating a function that discards the workout session and truncates the inserted values
+
+def discard_workout(workout_session_id):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""DELETE FROM workout.workout_sessions 
+                    WHERE workout_session_id = %s""",(workout_session_id,))
+    
+    conn.commit()
+    cur.close()
+    conn.close()
 # now a user can accidentally input the wrong information of sets, reps or weights
 # therefore, creating a "delete_set" function to provide editing features to the user
 
