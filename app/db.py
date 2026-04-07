@@ -47,14 +47,14 @@ def get_user_id (user_name):
 # creating a function that fetches the "user_id", "workout_date" and "workout_duration" from user input
 # inserts theese values into the "workout_sessions" table
 # then returns the "workout_session_id" & further closes the DB connection to avoid leaks
-def create_workout_session(user_id,workout_date,duration_minutes):
+def create_workout_session(user_id,workout_date,start_time):
     conn = get_connection()
     cur  = conn.cursor()
 
     # created a cursor object and this will execute the query
-    cur.execute(""" INSERT INTO workout.workout_sessions (user_id,workout_date,duration_minutes) VALUES
+    cur.execute(""" INSERT INTO workout.workout_sessions (user_id,workout_date,start_time) VALUES
                 (%s,%s,%s)
-                RETURNING workout_session_id; """,(user_id,workout_date,duration_minutes))
+                RETURNING workout_session_id; """,(user_id,workout_date,start_time))
     
     # now fetching the returned "workout_id" from returned query
     workout_session_id = cur.fetchone()[0]
@@ -64,6 +64,22 @@ def create_workout_session(user_id,workout_date,duration_minutes):
     conn.close()
 
     return workout_session_id
+
+# creating a function that will update the "workout_sessions" table when the user
+# clicks on "finish workout" button, that will record the workout duration and end time
+
+def update_workout_sessions(end_time,duration_minutes,workout_session_id):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(""" UPDATE workout.workout_sessions SET
+                    end_time =%s, duration_minutes =%s
+                WHERE workout_session_id = %s;""" ,(end_time,duration_minutes,workout_session_id))
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+
 
 # creating a function to fetch all the exercises listed in "exercises" table 
 def get_all_exercises():

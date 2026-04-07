@@ -185,11 +185,20 @@ if st.session_state.get("show_signup"):
     st.stop()
 
  # **************** Main UI TO TRACK WORKOUT *****************************
-
+from datetime import datetime
 with center:
     st.markdown("## 💪 Workout Tracker")
     st.caption("Track your workouts efficiently")
     st.markdown("### 🏁 Start Workout")
+
+
+
+    # adding timer UI
+    start_time = st.session_state.get("start_time")
+    if start_time:
+        duration = datetime.now() - start_time
+        minutes = int(duration.total_seconds() // 60)
+
 
 
 # defining column ratios
@@ -199,7 +208,12 @@ with center:
     # creating column labels
     col1.markdown("**User**")
     col2.markdown("**Date**")
-    col3.markdown("**Duration (min)**")
+    col3.markdown("**Time**")
+
+    mode = st.radio("Workout Mode",
+    ["Live Workout", "Log Past Workout"],
+    horizontal=True, key= 'mode'
+)
 
 if "reset_form" not in st.session_state:
     st.session_state["reset_form"] = False
@@ -220,7 +234,8 @@ with center:
         workout_date_input = st.date_input("Workout Date",key="workout_date",label_visibility="collapsed")
 
     with col3:
-        duration_input = st.number_input("Workout Duration",min_value=10,max_value=120,step=1,key="workout_duration",label_visibility="collapsed")
+        current_time = datetime.now().strftime("%H:%M:%S")
+        st.markdown(f"**🕒{current_time}**")
 
 # creating a session state to hold the values of some variables
 # that are required throughout the environment
@@ -238,20 +253,34 @@ if "set_number" not in st.session_state:
 # workout session details
 
 from db import create_workout_session
-
+from datetime import datetime
 with center:
     if st.button("Start Workout"):
-        # fetching user_id from the entered username from  the "users" table
         from db import get_user_id
         # checking empty or null value for username
         if not user_name:
             st.error("Username cannot be null")
             st.stop()
         user_id_input = get_user_id(user_name)
+
+        if st.session_state["mode"] == "Live Workout":
+            start_time = datetime.now()
+            end_time = None
+            duration = None
+                    
+            workout_session_id = create_workout_session(user_id_input,workout_date_input,start_time)
+            st.success(f"Workout Session Created,{workout_session_id}")
+            st.session_state["workout_session_id"] = workout_session_id
+            st.session_state["start_time"] = start_time
+
+    else:  # Log Past Workout
+        # you'll handle later
+        start_time = None
+        end_time = None
+        #duration = user_input_duration
+        # fetching user_id from the entered username from  the "users" table
         
-        workout_session_id = create_workout_session(user_id_input,workout_date_input,duration_input)
-        st.success(f"Workout Session Created,{workout_session_id}")
-        st.session_state["workout_session_id"] = workout_session_id
+
 
     st.divider()
 
@@ -264,30 +293,56 @@ with center:
 
 # let's list some exercises for the user to perform in the created workout session
 # therefore, importing the function from DB that fetches all exercises from "exercises" table
-
+from collections import defaultdict
 from db import get_all_exercises
 exercises_dict ={}
 
 exercises = get_all_exercises()
+muscle_to_exercises = defaultdict(list)
+
 for exercise in exercises:
     exercise_id = exercise[0]
     name = exercise[1]
     muscle_group = exercise[2]
-    display_name = name + " (" + muscle_group + ")"
+    display_name = name
     exercises_dict[display_name] = exercise_id
 
+# creating a list for muscle groups
+    muscle_to_exercises[muscle_group].append({
+        "id":exercise_id,
+        "name":name,
+        "display":display_name
+    })
 
-# creating exercise dropdown UI
 
+
+# creating dropdown lists for muscle groups and exercises seperately
+muscle_group_options = [None] + list(muscle_to_exercises.keys())
 options  = [None] + list(exercises_dict.keys())
+
+
 with center:
-    col7 = st.columns([2])
+    col1, col2 = st.columns([2,2])
 
-    with col7[0]:
-        selected_exercise = st.selectbox("Select Exercise",options, format_func= lambda x: "Select an exercise" if x is None else x
+    with col1:
+        # creating muscle_group dropdown UI
+        selected_muscle = st.selectbox("Select Muscle Group",muscle_group_options,format_func= lambda x: "Select Muscle Group" if x is None else x,
+                               label_visibility="collapsed",key= "muscle_group")
+        
+        # creating a filter based on muscle group selected 
+        if selected_muscle:
+            filtered_exercises = muscle_to_exercises[selected_muscle]
+            
+        else:
+            filtered_exercises=[]
+    exercise_options = [None] + filtered_exercises
+    with col2:
+        
+        # creating exercise dropdown UI
+        selected_exercise = st.selectbox("Select Exercise",exercise_options, format_func= lambda x: "Select an exercise" if x is None else x['display']
                                     ,label_visibility="collapsed",key="select_exercise")
-
-
+        derived_exercise_id = selected_exercise["id"] if selected_exercise else None
+        
 
 with center:
     if st.button("Add Exercise"):
@@ -301,7 +356,7 @@ with center:
                 st.warning("Please select an exercise")
                 st.stop()
             else:
-                exercise_id = exercises_dict[selected_exercise]
+                exercise_id = derived_exercise_id
 
 
         
@@ -466,7 +521,7 @@ with center:
     col1,col2,col3 = st.columns([2,2,2])
 
     with col2:
-        finish_button = st.button("🏁 Finish Workout", use_container_width=True)
+        finish_button = st.button("🏁 Finish Workout", use_container_width=True,disabled=not st.session_state.get("workout_session_id"))
 
     # now if the button is clicked, user must see a warning prompt before closing the session
 
@@ -474,6 +529,7 @@ with center:
         st.session_state["confirm_finish_workout"] = True
 
     if st.session_state.get("confirm_finish_workout"):
+
         # check for added sets before finishing the workout
         from db import get_total_sets_per_workout_session
         total_sets = get_total_sets_per_workout_session(workout_session_id)
@@ -537,8 +593,20 @@ with center:
                     keys_to_clear = [
                         "workout_session_id",
                         "workout_exercises_id",
-                        "set_number"
+                        "set_number",
+                        "start_time"
                     ]
+
+                    # here i update my "workout_sessions" table and input the "duration" & "end_time" of workout
+                    workout_session_id = st.session_state.get("workout_session_id")
+                    start_time = st.session_state.get("start_time")
+
+                    end_time = datetime.now()
+
+                    duration_minutes = int((end_time - start_time).total_seconds() // 60)
+                    from db import update_workout_sessions
+                    update_workout_sessions(end_time,duration_minutes,workout_session_id)
+
 
                     for key in keys_to_clear:
                         st.session_state.pop(key,None)
