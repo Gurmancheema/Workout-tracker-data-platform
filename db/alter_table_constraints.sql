@@ -29,5 +29,6 @@ UNIQUE(user_id,workout_date);
 
 ALTER TABLE workout.users
 ALTER COLUMN name SET NOT NULL;
+
 ALTER TABLE workout.users
 ADD CONSTRAINT username_not_empty CHECK (length(trim(name)) > 0);

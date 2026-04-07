@@ -19,6 +19,17 @@ if st.session_state.get("workout_finished"):
     st.success("Workout finished successfully!")
     st.session_state["workout_finished"] = False
 
+# defining a message placeholder if the user discards the workout 
+# process to print the success message
+message_placeholder_for_discarded_workout = st.empty()
+
+if "message_for_discarded_workout" not in st.session_state:
+    st.session_state["message_for_discarded_workout"] = None
+
+if st.session_state["message_for_discarded_workout"]:
+    message_placeholder_for_discarded_workout.success(st.session_state["message_for_discarded_workout"])
+    st.session_state["message_for_discarded_workout"] = None
+
 # ******* UI RENDERING STATES ***********
 if "show_signup" not in st.session_state:
     st.session_state["show_signup"] = False
@@ -283,6 +294,7 @@ with center:
         workout_session_id = st.session_state.get("workout_session_id")
         if workout_session_id is None:
             st.warning("No active workout session")
+            st.stop()
         else:
             # adding a warning
             if selected_exercise is None:
@@ -324,9 +336,9 @@ with center:
     from db import get_set_number
     workout_exercises_id = st.session_state.get("workout_exercises_id")
 
-    if workout_exercises_id is None:
-        st.error("Please add an exercise first")
-        st.stop()
+    #if workout_exercises_id is None:
+        #st.error("Please add an exercise first")
+        #st.stop()
     set_number = get_set_number(workout_exercises_id)
     with col8:
         st.markdown(f"**{set_number}**")
@@ -363,6 +375,8 @@ with center:
 
         if workout_exercises_id is None:
             st.error("Please add an exercise first")
+            st.session_state["reset_inputs"] = True
+            st.stop()
         else:
             set_id = create_exercises_sets(
                 workout_exercises_id,
@@ -441,13 +455,12 @@ if workout_session_id:
 
 
 
-
-
-
-
 # creating a close workout session button when the user is finished with his workout
 
 st.divider()
+
+
+
 
 with center:
     col1,col2,col3 = st.columns([2,2,2])
@@ -460,15 +473,56 @@ with center:
     if finish_button:
         st.session_state["confirm_finish_workout"] = True
 
+    if st.session_state.get("confirm_finish_workout"):
         # check for added sets before finishing the workout
         from db import get_total_sets_per_workout_session
         total_sets = get_total_sets_per_workout_session(workout_session_id)
 
-        st.write(total_sets)
-
         if total_sets == 0:
             st.warning("⚠️ No sets added.")
             st.session_state["show_discard_options"] = True
+            
+            st.write("show_discard_options:", st.session_state.get("show_discard_options"))
+            if st.session_state.get("show_discard_options"):
+            # give user a choice here to add set or discard the workout
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    if st.button("➕ Add Set Instead"):
+                        st.write("continue adding sets")
+                        st.rerun()
+                with col2:
+
+                    if st.button("Discard Workout Instead"):
+                        st.write("Button CLICKED!!!")
+                        st.write("imported function from db")
+                        from db import discard_workout
+                        
+                        workout_session_id = st.session_state.get("workout_session_id")
+                        
+                        # if user clicks the "discard button" twice, set a flag first
+
+                        if st.session_state.get("workout_session_id"):
+                            discard_workout(workout_session_id)
+
+
+                            st.session_state["message_for_discarded_workout"] = "Workout session discarded!"
+                            keys_to_clear = [
+                                                "workout_session_id",
+                                                "workout_exercises_id",
+                                                "set_number"
+                                            ]
+
+                            for key in keys_to_clear:
+                                st.session_state.pop(key, None)
+
+                            # Now trigger reset
+                            st.session_state["reset_form"] = True
+                            st.rerun()
+                        else:
+                            st.error("No active workout sessions")
+                            st.session_state["reset_form"] = True
+                            st.rerun()
 
         if total_sets > 0 :
             # prompt warning message
@@ -504,29 +558,3 @@ with center:
                 if st.button("❌ No, Cancel"):
                     st.session_state["confirm_finish_workout"] = False
                     st.rerun()
-    
-    if st.session_state.get("show_discard_options"):
-    # give user a choice here to add set or discard the workout
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if st.button("➕ Add Set Instead"):
-                st.info("Please add a set to continue")
-        with col2:
-            if st.button("Discard Workout Instead"):
-                from db import discard_workout
-                workout_session_id = st.session_state.get("workout_session_id")
-                discard_workout(workout_session_id)
-                st.success("Workout discarded")
-                keys_to_clear = [
-                                    "workout_session_id",
-                                    "workout_exercises_id",
-                                    "set_number"
-                                ]
-
-                for key in keys_to_clear:
-                    st.session_state.pop(key, None)
-
-                # Now trigger reset
-                st.session_state["reset_form"] = True
-                st.rerun()

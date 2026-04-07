@@ -83,6 +83,9 @@ INSERT INTO workout.exercises (exercise_name,muscle_group) VALUES
                 ('Reverse Wrist Curl','Forearms'),
                 ('Wrist Curl','Forearms');
 
+INSERT INTO workout.exercises (exercise_name,muscle_group) VALUES 
+    ('Treadmill','Cardio'),
+    ('Elliptical','Cardio');
 SELECT * FROM workout.exercises;
 
 -- if the SERIAL Count is out of sync, use the following code:
