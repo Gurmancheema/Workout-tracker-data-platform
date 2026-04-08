@@ -155,7 +155,7 @@ def render_history_ui():
                 related_user_id = get_user_id(user_name_input)
 
             if not related_user_id:
-                st.error("User not found!")
+                st.error("⚠️ User not found. Please sign up first.")
                 return
 
             with st.spinner("📊 Loading workout data..."):
