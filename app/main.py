@@ -384,13 +384,15 @@ if st.session_state["reset_form"]:
     st.session_state["select_exercise"] = "Select Exercise"
     st.session_state["reset_form"] = False
 
+today = datetime.now()
+min_date = today - timedelta(days=7)
 # defining column placeholders
 with center:
     with col1:
         user_name = st.text_input("Username",key="user_name",label_visibility="collapsed")
 
     with col2:
-        workout_date_input = st.date_input("Workout Date",key="workout_date",min_value=date.today(),
+        workout_date_input = st.date_input("Workout Date",key="workout_date",min_value=min_date,
                                            max_value=date.today(),label_visibility="collapsed")
     with col3:
         current_time = datetime.now().strftime("%H:%M:%S")
