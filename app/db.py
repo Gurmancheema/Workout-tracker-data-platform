@@ -5,15 +5,7 @@ import psycopg2
 # creating a function to establish database connection
 # need only 4 arguments
 def get_connection():
-    return psycopg2.connect(
-         "postgresql://postgres.rydryqnizixrlqegivlq:gurmanjotnewpassword123@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres"
-        #host = 'db.rydryqnizixrlqegivlq.supabase.co',
-        #port = 5432,
-        #database='postgres',
-        #user = 'postgres',
-        #password = 'Gurmanjot121*',
-        #sslmode='require'
-)
+    return psycopg2.connect("DB_URL")
 
 # creating a function that creates a new user
 # will add a "sign-up" button to create the new user
