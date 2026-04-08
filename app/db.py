@@ -1,11 +1,11 @@
 # Importing necessary packages
 # Psycopg2-binary is necessary package to enable communication between Python & Postgresql
 import psycopg2
-
+import streamlit as st
 # creating a function to establish database connection
 # need only 4 arguments
 def get_connection():
-    return psycopg2.connect("DB_URL")
+    return psycopg2.connect("postgresql://postgres.rydryqnizixrlqegivlq:gurmanjotnewpassword123@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres")
 
 # creating a function that creates a new user
 # will add a "sign-up" button to create the new user
