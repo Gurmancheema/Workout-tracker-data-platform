@@ -47,7 +47,7 @@ def get_user_id (user_name):
 # creating a function that fetches the "user_id", "workout_date" and "workout_duration" from user input
 # inserts theese values into the "workout_sessions" table
 # then returns the "workout_session_id" & further closes the DB connection to avoid leaks
-def create_workout_session(user_id,workout_date,start_time):
+def create_workout_session(user_id,workout_date,start_time,end_time=None,duration=None):
     conn = get_connection()
     cur  = conn.cursor()
 

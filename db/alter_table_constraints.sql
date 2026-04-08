@@ -32,3 +32,10 @@ ALTER COLUMN name SET NOT NULL;
 
 ALTER TABLE workout.users
 ADD CONSTRAINT username_not_empty CHECK (length(trim(name)) > 0);
+
+ALTER TABLE workout.workout_sessions
+ADD COLUMN start_time TIMESTAMP,
+ADD COLUMN end_time TIMESTAMP;
+
+ALTER TABLE workout.workout_sessions
+ALTER COLUMN duration_minutes DROP NOT NULL;

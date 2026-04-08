@@ -1,8 +1,12 @@
 # working on front-end now , since i decided to use streamlit therefore
 # Importing streamlit & necessary python packages
 import streamlit as st
+import psycopg2
+from datetime import date,datetime,timedelta
+from psycopg2 import errors
+from collections import defaultdict
+
 print(st.__version__)
-from datetime import date
 
 
 # setting page configuration
@@ -13,10 +17,19 @@ st.set_page_config(
     )
 left, center, right = st.columns([1, 3, 1])
 
-# ********* NOTIFICATIONS SECTION *************
+# ******************* NOTIFICATIONS SECTION *********************************
 
+# since the program reruns after completing a workout session
+# therefore, display the success message here, right at beginning
 if st.session_state.get("workout_finished"):
-    st.success("Workout finished successfully!")
+    st.success(f"""
+                    🎉 **Workout Complete!**
+
+                    🔥 Great job staying consistent  
+                    📊 Your progress has been saved  
+
+                    👉 Check your history to track improvements
+                    """)
     st.session_state["workout_finished"] = False
 
 # defining a message placeholder if the user discards the workout 
@@ -30,14 +43,33 @@ if st.session_state["message_for_discarded_workout"]:
     message_placeholder_for_discarded_workout.success(st.session_state["message_for_discarded_workout"])
     st.session_state["message_for_discarded_workout"] = None
 
-# ******* UI RENDERING STATES ***********
+# **************************** UI RENDERING STATES *************************
+
+# Streamlit reruns the entire script on every user interaction (button click, input, etc.).
+# session_state acts as persistent memory across these reruns, allowing us to:
+# - maintain UI navigation (pages, screens)
+# - preserve user inputs and workflow progress
+# - control conditional rendering (show/hide components)
+# - avoid losing data between interactions
+# Without session_state, the app would reset on every action, breaking user experience.
+
 if "show_signup" not in st.session_state:
     st.session_state["show_signup"] = False
 
 if "show_history" not in st.session_state:
     st.session_state["show_history"] = False
 
-# ************ RENDER FUNCTIONS DEFINITIONS ********************
+if "log_past_workout" not in st.session_state:
+    st.session_state["log_past_workout"] = False
+
+if "show_success_message" not in st.session_state:
+    st.session_state["show_success_message"] = False
+
+# this one re-directs the user from loggin past workout to entering exercises & sets
+if "page" not in st.session_state:
+    st.session_state["page"] = "main"
+
+# ************************** RENDER FUNCTIONS DEFINITIONS *********************************
 
 # 1. RENDER WORKOUT HISTORY
 
@@ -48,7 +80,7 @@ def render_history_ui():
         st.subheader("Workout History")
 
         user_name_input = st.text_input("Enter username",key="history_username")
-        past_workout_date_input = st.date_input("Select workout day",key="history_date")
+        past_workout_date_input = st.date_input("Select workout day",key="history_date",max_value=date.today())
         
         if st.button("Fetch Workout"):
             from db import get_user_id
@@ -59,13 +91,16 @@ def render_history_ui():
                 st.error("User not found!")
                 return
 
+            # using DB function to fetch historical data based on inputs
             from db import fetch_historical_workout_data
             hist_data = fetch_historical_workout_data(
                 related_user_id,
                 past_workout_date_input
             )
 
-            # printing the fetched historical data now
+            # printing the fetched historical data
+            # since "hist_data" returns the data in the form of rows of values
+            # therefore, i can loop across them to print them in anyway
             current_exercise = None
 
             for row in hist_data:
@@ -77,7 +112,7 @@ def render_history_ui():
                     st.markdown(f"### {exercise_order}. 💪 {muscle_group} - {exercise_name}")
                     current_exercise = exercise_name
 
-                st.write(f"Set {set_number} → {reps} reps | {weight} kg")
+                st.write(f"Set {set_number}  →  {reps} reps | {weight}  kg")
 
             st.markdown("## 📊 Performance Summary")
 
@@ -96,10 +131,20 @@ def render_history_ui():
                     exercise_stats[exercise_name]["max_reps"], reps
                 )
 
+            st.markdown("### 📊 Exercise Performance")
+
             for exercise, stats in exercise_stats.items():
-                st.write(
-                    f"{exercise} → Max Weight: {stats['max_weight']} kg | Max Reps: {stats['max_reps']}"
-                )
+                st.markdown(f"#### 🏋️ {exercise}")
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.metric("**💪 Max Weight**", f"{stats['max_weight']} kg")
+
+                with col2:
+                    st.metric("**🔁 Max Reps**", f"{stats['max_reps']}")
+
+                st.divider()
 
         if st.button("⬅ Back"):
             st.session_state["show_history"] = False
@@ -110,25 +155,27 @@ def render_history_ui():
 
 def render_signup_ui():
     from db import create_new_user
-    import psycopg2
-    from psycopg2 import errors
 
     # creating function to check that either of entered credentials are not left empty
-
     def check_credentials_and_insert(name,email_id):
         if not name or not email_id:
             st.error("All fields are required")
             return
         
+        # using strip() to avoid any leading or trailing whitespace issues while entering data
         try:
             create_new_user(name.strip(),email_id.strip())
-            st.success("User profile created")
+            with center:
+                st.success("🎉 Account created successfully! You can now start your workout session 💪")
 
-            # reset the fields now
+            # Reset signup flag to return user to main UI after successful account creation.
+            # Without this, the signup screen would keep rendering on every rerun.
             st.session_state["show_signup"] = False
 
             return
-
+        
+        # let's handle potentital errors from DB
+        # checking for constraint errors and all DB errors
         except psycopg2.Error as e:
 
             if isinstance(e, psycopg2.errors.UniqueViolation):
@@ -143,6 +190,7 @@ def render_signup_ui():
         return
     
     # Enter new user details
+    # defining UI too
     with center:
         if st.session_state["show_signup"]:
             st.markdown("## 💪 Workout Tracker")
@@ -156,24 +204,98 @@ def render_signup_ui():
 
             # creating buttons and defining their actions
             with col1:
-                if st.button("Create Account"):
-                    check_credentials_and_insert(signup_name,signup_email)
+                if st.button("✨ Create Account", type="primary", use_container_width=True):
+                    with st.spinner("Creating your account..."):
+                        check_credentials_and_insert(signup_name,signup_email)
             
             with col2:
                 if st.button("Cancel"):
                     st.session_state["show_signup"] = False
                     st.rerun()
 
-# Aligning configurations for feature buttons
-with right:    
-    col_left , col_right = st.columns([2,5])
+# 3. RENDER LOG PAST WORKOUT SCREEN
 
-# Feature buttons working
-with col_right:
-    if st.button("Sign Up"):
+def render_past_workout_ui():
+    with center:
+        st.markdown("## 💪 Workout Tracker")
+        st.caption("Track your workouts efficiently")
+        st.markdown("### 📝 Log Past Workout")
+
+        col1, col2, col3 = st.columns([2, 2, 2])
+
+        # creating column labels
+        col1.markdown("**User**")
+        col2.markdown("**Date**")
+        col3.markdown("**Est. Duration (mins)**")
+
+        # configuring date values
+        # user can only log past workout for previous week, not before that
+        today = date.today()
+        min_date = today - timedelta(days=7)
+
+    with col1:
+        user_name = st.text_input("Username",key="name",label_visibility="collapsed")
+
+    with col2:
+        workout_date_input = st.date_input("Workout Date",min_value=min_date,
+                                           max_value=date.today(),
+                                           key="date",label_visibility="collapsed")
+
+    with col3:
+        estimated_duration = st.number_input("Duration (mins)",key="duration",step=1.0,
+                                             label_visibility="collapsed")
+
+    with col2:
+        if st.button("📝 Log Workout Session",type="primary",use_container_width=True):
+            
+            # estimating the end time & start time of workout
+            # based on workout date and duration entered by user 
+
+            end_time = datetime.combine(workout_date_input, datetime.min.time()) + timedelta(hours=18)
+            start_time = end_time - timedelta(minutes=estimated_duration)
+
+            from db import get_user_id
+            # checking empty or null value for username
+            if not user_name:
+                st.error("⚠️ Username cannot be null")
+                st.stop()
+            
+            # fetching relative user_id from user_name
+            user_id_input = get_user_id(user_name)
+            
+            # edge case handling if no existing username matches in DB
+            if not user_id_input:
+                st.error("⚠️ User not found. Please sign up first.")
+                st.stop()
+            
+            # Store everything in session_state
+            st.session_state["user_id_input"] = user_id_input
+            st.session_state["workout_date"] = workout_date_input
+            st.session_state["start_time"] = start_time
+            st.session_state["end_time"] = end_time
+            st.session_state["duration_minutes"] = estimated_duration
+
+        
+            # Go back to main workout UI
+            st.session_state["page"] = "main"
+            st.session_state["log_past_workout"] = False
+
+            st.rerun()
+
+        if st.button("⬅ Back"):
+            st.session_state["log_past_workout"] = False
+            st.session_state["page"] = "main"
+            st.rerun()
+
+
+# Aligning feature buttons
+with right:
+    if st.button("👤 Sign Up"):
         st.session_state["show_signup"] = True
-    if st.button("Workout History"):
+    if st.button("📊 Workout History"):
         st.session_state["show_history"] = True
+    if st.button("📝 Log Workout"):
+        st.session_state["log_past_workout"] = True
 
 # Render functions flag
 if st.session_state.get("show_history"):
@@ -184,25 +306,58 @@ if st.session_state.get("show_signup"):
     render_signup_ui()
     st.stop()
 
+if st.session_state.get("log_past_workout"):
+    render_past_workout_ui()
+    st.stop()
+
+# if this state is true, then show main UI, therefore pass
+# particulary, re-directing the user from "log past workout" screen to "main UI screen"
+# to enter exercises and sets
+elif st.session_state["page"] == "main":
+    pass 
+
+# Detects when user is redirected from "Log Past Workout" flow.
+# If start_time and end_time are already present (from past workout input)
+# and no workout_session_id exists yet, it means the session has not been created in DB.
+# This block creates the workout session using pre-filled data and stores the session ID.
+# Also sets a flag to trigger a success message after redirection.
+if (
+    st.session_state.get("start_time") and
+    st.session_state.get("end_time") and
+    not st.session_state.get("workout_session_id")):
+
+
+    from db import create_workout_session
+
+    workout_session_id = create_workout_session(
+        st.session_state.get("user_id_input"),
+        st.session_state.get("workout_date"),
+        st.session_state.get("start_time"),
+        st.session_state.get("end_time"),
+        st.session_state.get("duration")
+    )
+    st.session_state["workout_session_id"] = workout_session_id
+    st.session_state["show_success_message"] = True
+
+
+
+
  # **************** Main UI TO TRACK WORKOUT *****************************
-from datetime import datetime
 with center:
     st.markdown("## 💪 Workout Tracker")
     st.caption("Track your workouts efficiently")
     st.markdown("### 🏁 Start Workout")
 
+# display message here for user who logged past workout details
+# now proceeding further to add exercises and sets
 
-
-    # adding timer UI
-    start_time = st.session_state.get("start_time")
-    if start_time:
-        duration = datetime.now() - start_time
-        minutes = int(duration.total_seconds() // 60)
-
-
-
-# defining column ratios
 with center:
+    if st.session_state.get("show_success_message"):
+        st.success("✅ Workout session created successfully! Go ahead and add Exercises and Sets")
+        st.session_state["show_success_message"] = False
+
+
+    # defining column ratios for main UI
     col1, col2, col3 = st.columns([2, 2, 1.5])
 
     # creating column labels
@@ -210,35 +365,32 @@ with center:
     col2.markdown("**Date**")
     col3.markdown("**Time**")
 
-    mode = st.radio("Workout Mode",
-    ["Live Workout", "Log Past Workout"],
-    horizontal=True, key= 'mode'
-)
-
+# Reset form fields when reset_form flag is triggered.
+# This ensures UI inputs are cleared after actions like finishing or discarding a workout.
+# The flag is immediately set back to False to prevent repeated resets on every rerun.
 if "reset_form" not in st.session_state:
     st.session_state["reset_form"] = False
 
 if st.session_state["reset_form"]:
     st.session_state["user_name"] = ""
     st.session_state["workout_date"] = date.today()
-    st.session_state["workout_duration"] = 10  # respect min_value
     st.session_state["select_exercise"] = "Select Exercise"
-
     st.session_state["reset_form"] = False
+
 # defining column placeholders
 with center:
     with col1:
         user_name = st.text_input("Username",key="user_name",label_visibility="collapsed")
 
     with col2:
-        workout_date_input = st.date_input("Workout Date",key="workout_date",label_visibility="collapsed")
-
+        workout_date_input = st.date_input("Workout Date",key="workout_date",min_value=date.today(),
+                                           max_value=date.today(),label_visibility="collapsed")
     with col3:
         current_time = datetime.now().strftime("%H:%M:%S")
         st.markdown(f"**🕒{current_time}**")
 
-# creating a session state to hold the values of some variables
-# that are required throughout the environment
+# creating session states to hold the values of some variables
+# that are required through out the environment
 workout_session_id = st.session_state.get("workout_session_id")
 if "workout_session_id" not in st.session_state:
     st.session_state["workout_session_id"] = None
@@ -246,54 +398,61 @@ if "workout_session_id" not in st.session_state:
 if "set_number" not in st.session_state:
     st.session_state["set_number"] = 1
 
+# fetching, verifying & inserting user input from & into the DB
+# At the press of "Start Workout" button, the workout session details will be inserted into DB
+# and a unique workout_session_id will be created for that particular "user" for that particular "date"
 
-
-
-# since now we have our user fetched from DB, let's fetch the function from DB that will store
-# workout session details
-
-from db import create_workout_session
-from datetime import datetime
 with center:
-    if st.button("Start Workout"):
-        from db import get_user_id
+    if st.button("🚀 Start Workout",type="primary"):
+
         # checking empty or null value for username
         if not user_name:
             st.error("Username cannot be null")
             st.stop()
+
+        # fetching relevant user_id from the entered user_name
+        from db import get_user_id
         user_id_input = get_user_id(user_name)
 
-        if st.session_state["mode"] == "Live Workout":
-            start_time = datetime.now()
-            end_time = None
-            duration = None
-                    
-            workout_session_id = create_workout_session(user_id_input,workout_date_input,start_time)
-            st.success(f"Workout Session Created,{workout_session_id}")
-            st.session_state["workout_session_id"] = workout_session_id
-            st.session_state["start_time"] = start_time
+        if not user_id_input:
+            st.error("❌ User not found. Please sign up first.")
+            st.stop()
 
-    else:  # Log Past Workout
-        # you'll handle later
-        start_time = None
-        end_time = None
-        #duration = user_input_duration
-        # fetching user_id from the entered username from  the "users" table
+        # since user clicked on "start workout" button
+        # we need to keep a track of "start_time" of the session
+        # therefore, storing the current time in session state
+        if "start_time" not in st.session_state:
+            st.session_state["start_time"] = datetime.now()
         
+        start_time = st.session_state["start_time"]
+        
+        # inserting the verified values into the DB now
+        from db import create_workout_session
+        workout_session_id = create_workout_session(user_id_input,workout_date_input,start_time)
+        st.success(f"""
+                        💪 Workout started, {user_name}!
 
+                        👉 Select an exercise  
+                        👉 Add your sets  
+                        👉 Track your progress
+                        """)
+        
+        # storing the retrieved "workout_session_id" in session state
+        # as this will be used numerous times in whole environment
+        st.session_state["workout_session_id"] = workout_session_id        
 
     st.divider()
 
 
-# At the press of "Start Workout" button, the workout session details will be inserted into DB
-# and a unique workout_session_id will be created for that particular "user" for that particular "date"
-
+# ************************* SELECTING & ADDING EXERCISE SECTION ****************************
 
     st.markdown("### 🏋️ Select Exercise")
 
 # let's list some exercises for the user to perform in the created workout session
 # therefore, importing the function from DB that fetches all exercises from "exercises" table
-from collections import defaultdict
+# creating two seperate dropdown menus for "muscle_groups" and "exercises" which will be linked
+# only related exercises will be shown when user selects a particular muscle group
+
 from db import get_all_exercises
 exercises_dict ={}
 
@@ -314,12 +473,9 @@ for exercise in exercises:
         "display":display_name
     })
 
-
-
 # creating dropdown lists for muscle groups and exercises seperately
 muscle_group_options = [None] + list(muscle_to_exercises.keys())
 options  = [None] + list(exercises_dict.keys())
-
 
 with center:
     col1, col2 = st.columns([2,2])
@@ -345,11 +501,18 @@ with center:
         
 
 with center:
-    if st.button("Add Exercise"):
+    if st.button("➕ Add Exercise",type="primary"):
+
+        # fetch ongoing workout session first
         workout_session_id = st.session_state.get("workout_session_id")
         if workout_session_id is None:
-            st.warning("No active workout session")
+            st.info("""
+                        👋 Looks like you haven’t started a workout yet!
+
+                        👉 Click **Start Workout** to begin tracking your session 💪
+                        """)
             st.stop()
+
         else:
             # adding a warning
             if selected_exercise is None:
@@ -358,21 +521,31 @@ with center:
             else:
                 exercise_id = derived_exercise_id
 
-
-        
-
             # fetch the current exercise order for the current workout session
             from db import get_exercises_order
             exercise_order = get_exercises_order(workout_session_id)
 
+            # inserting the data into relative table in DB
             from db import create_workout_exercises
-            workout_exercises_id = create_workout_exercises(
-                workout_session_id,
-                exercise_id,
-                exercise_order
-            )
-            st.success(f"Exercise added! ID: {workout_exercises_id}")
-            st.session_state["workout_exercises_id"] = workout_exercises_id
+            try:
+                workout_exercises_id = create_workout_exercises(
+                    workout_session_id,
+                    exercise_id,
+                    exercise_order
+                )
+                st.success(f"""
+                                ✅ **{selected_exercise["display"]} added!**
+
+                                👉 Now add your sets below  
+                                👉 Track reps & weight
+                                """)
+                st.session_state["workout_exercises_id"] = workout_exercises_id
+
+            except errors.UniqueViolation:
+                st.warning("⚠️ This exercise is already added to the workout!")
+                
+
+# ************************* SETS, REPS & WEIGHTS SECTION ****************************
 
 # UI to insert the sets, reps & weights into the table "exercises_sets"
 
@@ -385,8 +558,8 @@ with center:
     col8,col4, col5, col6 = st.columns([1, 1, 1, 1])
     col8.markdown("**Set Number**")
     col4.markdown("**Reps**")
-    col5.markdown("**Weight**")
-    col6.markdown("**Duration**")
+    col5.markdown("**Weight (kg)**")
+    col6.markdown("**Duration (secs)**")
 
     from db import get_set_number
     workout_exercises_id = st.session_state.get("workout_exercises_id")
@@ -425,7 +598,7 @@ with center:
         message_placeholder.success(st.session_state["success_message"])
         st.session_state["success_message"] = None
         
-    if st.button("Add Set"):
+    if st.button("➕ Add Set", type="primary"):
         workout_exercises_id = st.session_state.get("workout_exercises_id")
 
         if workout_exercises_id is None:
@@ -448,14 +621,13 @@ with center:
             st.session_state["reset_inputs"] = True
 
             st.rerun()
+
 st.divider()
 
-
+# ************************* WORKOUT PROGRESS SECTION ****************************
 
 st.markdown("### 📊 Workout Progress")
 from db import get_whole_workout_session
-
-from collections import defaultdict
 
 workout_session_id = st.session_state.get("workout_session_id")
 
@@ -508,20 +680,19 @@ if workout_session_id:
                     delete_set(set_id)
                     st.rerun()
 
-
-
-# creating a close workout session button when the user is finished with his workout
-
 st.divider()
 
 
 
+# ************************* FINISH WORKOUT SECTION ****************************
 
 with center:
     col1,col2,col3 = st.columns([2,2,2])
 
     with col2:
-        finish_button = st.button("🏁 Finish Workout", use_container_width=True,disabled=not st.session_state.get("workout_session_id"))
+        finish_button = st.button("🏁 Finish Workout",type="secondary",
+                                   use_container_width=True,
+                                   disabled=not st.session_state.get("workout_session_id"))
 
     # now if the button is clicked, user must see a warning prompt before closing the session
 
@@ -538,20 +709,16 @@ with center:
             st.warning("⚠️ No sets added.")
             st.session_state["show_discard_options"] = True
             
-            st.write("show_discard_options:", st.session_state.get("show_discard_options"))
             if st.session_state.get("show_discard_options"):
             # give user a choice here to add set or discard the workout
                 col1, col2 = st.columns(2)
 
                 with col1:
                     if st.button("➕ Add Set Instead"):
-                        st.write("continue adding sets")
                         st.rerun()
-                with col2:
 
+                with col2:
                     if st.button("Discard Workout Instead"):
-                        st.write("Button CLICKED!!!")
-                        st.write("imported function from db")
                         from db import discard_workout
                         
                         workout_session_id = st.session_state.get("workout_session_id")
@@ -566,7 +733,11 @@ with center:
                             keys_to_clear = [
                                                 "workout_session_id",
                                                 "workout_exercises_id",
-                                                "set_number"
+                                                "set_number",
+                                                "start_time",
+                                                "end_time",
+                                                "duration_minutes",
+                                                "user_id"
                                             ]
 
                             for key in keys_to_clear:
@@ -581,32 +752,55 @@ with center:
                             st.rerun()
 
         if total_sets > 0 :
-            # prompt warning message
-            st.warning("Are you sure you want to finish the workout?")
+
+            # this end_time is calculated only when user is logging past workout
+            existing_end_time = st.session_state.get("end_time")
+
+            if existing_end_time:
+                st.warning("💾 Save this past workout?")
+            else:
+                # since there is no existing_end_time, means this is the end of live workout session
+                st.warning("🏁 Are you sure you want to finish the workout?")
 
             col1,col2 = st.columns(2)
 
 
             with col1:
-                if st.button("✅ Yes, Finish"):
+                label = "💾 Save Workout" if existing_end_time else "🏁 Finish Workout"
+
+                if st.button(label):
                     #CLEAR STATE
                     keys_to_clear = [
                         "workout_session_id",
                         "workout_exercises_id",
                         "set_number",
-                        "start_time"
+                        "start_time",
+                        "end_time",
+                        "duration_minutes"
                     ]
 
                     # here i update my "workout_sessions" table and input the "duration" & "end_time" of workout
                     workout_session_id = st.session_state.get("workout_session_id")
                     start_time = st.session_state.get("start_time")
+                    existing_end_time = st.session_state.get("end_time")
+                    estimated_duration = st.session_state.get("duration_mintues")
 
-                    end_time = datetime.now()
+                    #  Only calculate for LIVE workouts
+                    if not existing_end_time:
+                        end_time = datetime.now()
+                        #for debugging
+                        #st.write("start_time:", start_time)
+                        #st.write("end_time:", end_time)
 
-                    duration_minutes = int((end_time - start_time).total_seconds() // 60)
-                    from db import update_workout_sessions
-                    update_workout_sessions(end_time,duration_minutes,workout_session_id)
+                        duration_minutes = int((end_time - start_time).total_seconds() // 60)
 
+                        from db import update_workout_sessions
+                        update_workout_sessions(end_time, duration_minutes, workout_session_id)
+
+                    # For past workouts 
+                    else:
+                        from db import update_workout_sessions
+                        update_workout_sessions(existing_end_time, estimated_duration, workout_session_id)
 
                     for key in keys_to_clear:
                         st.session_state.pop(key,None)
@@ -614,8 +808,6 @@ with center:
                     # Trigger reset instead of direct clearing
                     st.session_state["reset_form"] = True
 
-                    
-                    
                     # after resetting keys again set the confirm_finish_session state to False
                     st.session_state["confirm_finish_workout"] = False
                     st.session_state["workout_finished"] = True
