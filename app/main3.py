@@ -15,6 +15,9 @@
 
 import streamlit as st
 import psycopg2
+import pytz
+
+IST = pytz.timezone("Asia/Kolkata")
 from psycopg2 import errors
 from datetime import date, datetime, timedelta
 from collections import defaultdict
@@ -397,7 +400,7 @@ with center:
             min_value=min_date, max_value=date.today(), label_visibility="collapsed"
         )
     with col3:
-        current_time = datetime.now().strftime("%H:%M:%S")
+        current_time = datetime.now(IST).strftime("%H:%M:%S")
         st.markdown(f"**🕒 {current_time}**")
 
 workout_session_id = st.session_state.get("workout_session_id")
