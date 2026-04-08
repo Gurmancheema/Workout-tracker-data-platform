@@ -268,6 +268,13 @@ def render_past_workout_ui():
                 st.error("⚠️ User not found. Please sign up first.")
                 st.stop()
             
+            # also checking if user has already logged the workout session for particular date
+            from db import check_existing_session
+            existing_session = check_existing_session(user_id_input,workout_date_input)
+            if existing_session:
+                with center:
+                    st.error("⚠️ You already have a workout logged for this date.")
+                st.stop()
             # Store everything in session_state
             st.session_state["user_id_input"] = user_id_input
             st.session_state["workout_date"] = workout_date_input
@@ -418,6 +425,13 @@ with center:
             st.error("❌ User not found. Please sign up first.")
             st.stop()
 
+        # also checking if user has already logged the workout session for particular date
+        from db import check_existing_session
+        existing_session = check_existing_session(user_id_input,workout_date_input)
+        if existing_session:
+            st.error("⚠️ You already have a workout logged for this date.")
+            st.stop()
+        
         # since user clicked on "start workout" button
         # we need to keep a track of "start_time" of the session
         # therefore, storing the current time in session state

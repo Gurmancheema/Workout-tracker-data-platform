@@ -43,6 +43,23 @@ def get_user_id (user_name):
 
     return user_id
 
+# creating a function that fetches the "user_id" & "workout_date" & looks for match in DB
+# since , a user can have only one workout session per day, therefore, to avoid overriding
+# although DB constraints are inplace, creating a function for supporting UI level constraint
+
+def check_existing_session(user_id,workout_date):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(""" SELECT workout_session_id 
+                    FROM workout.workout_sessions 
+                    WHERE user_id = %s AND workout_date = %s""",(user_id,workout_date))
+    
+    resulting_workout_session_id = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    return resulting_workout_session_id
 
 # creating a function that fetches the "user_id", "workout_date" and "workout_duration" from user input
 # inserts theese values into the "workout_sessions" table
