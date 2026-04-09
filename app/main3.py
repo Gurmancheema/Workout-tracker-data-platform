@@ -286,6 +286,7 @@ def render_past_workout_ui():
             if not estimated_duration:
                 with center:
                     st.error("⚠️ Please enter an estimated duration of workout in minutes")
+                st.stop()
 
             with st.spinner("🔍 Verifying user..."):
                 user_id_input = get_user_id(user_name)
@@ -660,6 +661,9 @@ with center:
                             with st.spinner("🗑️ Discarding workout..."):
                                 discard_workout(workout_session_id)
                             st.session_state["message_for_discarded_workout"] = "Workout session discarded!"
+                            
+                            # reset options flag
+                            st.session_state["show_discard_options"] = False
 
                             keys_to_clear = [
                                 "workout_session_id", "workout_exercises_id",
