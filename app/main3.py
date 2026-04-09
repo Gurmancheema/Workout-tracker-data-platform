@@ -280,10 +280,12 @@ def render_past_workout_ui():
     with col2:
         if st.button("📝 Log Workout Session", type="primary", use_container_width=True):
             if not user_name:
-                st.error("⚠️ Please enter your username")
+                with center:
+                    st.error("⚠️ Please enter your username")
                 st.stop()
             if not estimated_duration:
-                st.error("⚠️ Please enter an estimated duration of workout in minutes",use_container_width=True)
+                with center:
+                    st.error("⚠️ Please enter an estimated duration of workout in minutes",use_container_width=True)
 
             with st.spinner("🔍 Verifying user..."):
                 user_id_input = get_user_id(user_name)
