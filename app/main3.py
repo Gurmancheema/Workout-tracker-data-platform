@@ -285,7 +285,7 @@ def render_past_workout_ui():
                 st.stop()
             if not estimated_duration:
                 with center:
-                    st.error("⚠️ Please enter an estimated duration of workout in minutes",use_container_width=True)
+                    st.error("⚠️ Please enter an estimated duration of workout in minutes")
 
             with st.spinner("🔍 Verifying user..."):
                 user_id_input = get_user_id(user_name)
