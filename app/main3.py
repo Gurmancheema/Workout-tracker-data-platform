@@ -351,8 +351,8 @@ elif st.session_state["page"] == "main":
 if (
     st.session_state.get("start_time")
     and st.session_state.get("end_time")
-    and not st.session_state.get("workout_session_id")
-):
+    and not st.session_state.get("workout_session_id")):
+
     workout_session_id = create_workout_session(
         st.session_state.get("user_id_input"),
         st.session_state.get("workout_date"),
@@ -394,7 +394,7 @@ today = datetime.now()
 min_date = today - timedelta(days=7)
 
 with center:
-    if workout_session_id:
+    if st.session_state.get("workout_session_id"):
         st.info("✅ Workout session active — add your exercises and sets below.")
     else:
         with col1:
