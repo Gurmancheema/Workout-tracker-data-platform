@@ -283,7 +283,7 @@ def render_past_workout_ui():
                 st.error("⚠️ Please enter your username")
                 st.stop()
             if not estimated_duration:
-                st.error("⚠️ Please enter an estimated duration of workout in minutes")
+                st.error("⚠️ Please enter an estimated duration of workout in minutes",use_container_width=True)
 
             with st.spinner("🔍 Verifying user..."):
                 user_id_input = get_user_id(user_name)
@@ -408,40 +408,40 @@ with center:
             current_time = datetime.now(IST).strftime("%H:%M:%S")
             st.markdown(f"**🕒 {current_time}**")
 
-    workout_session_id = st.session_state.get("workout_session_id")
+        workout_session_id = st.session_state.get("workout_session_id")
 
     # ── Start Workout Button ─────────────────────────────────────────────────────
-    with center:
-        if st.button("🚀 Start Workout", type="primary"):
-            if not user_name:
-                st.error("⚠️ Please enter your username")
-                st.stop()
+        with center:
+            if st.button("🚀 Start Workout", type="primary"):
+                if not user_name:
+                    st.error("⚠️ Please enter your username")
+                    st.stop()
 
-            with st.spinner("🔍 Verifying user..."):
-                user_id_input = get_user_id(user_name)
-            if not user_id_input:
-                st.error("❌ User not found. Please sign up first.")
-                st.stop()
+                with st.spinner("🔍 Verifying user..."):
+                    user_id_input = get_user_id(user_name)
+                if not user_id_input:
+                    st.error("❌ User not found. Please sign up first.")
+                    st.stop()
 
-            with st.spinner("📅 Checking for existing session..."):
-                existing_session = check_existing_session(user_id_input, workout_date_input)
-            if existing_session:
-                st.error("⚠️ You already have a workout logged for this date.")
-                st.stop()
+                with st.spinner("📅 Checking for existing session..."):
+                    existing_session = check_existing_session(user_id_input, workout_date_input)
+                if existing_session:
+                    st.error("⚠️ You already have a workout logged for this date.")
+                    st.stop()
 
-            _init_state("start_time", datetime.now())
-            start_time = st.session_state["start_time"]
+                _init_state("start_time", datetime.now())
+                start_time = st.session_state["start_time"]
 
-            with st.spinner("🚀 Starting your workout session..."):
-                workout_session_id = create_workout_session(user_id_input, workout_date_input, start_time)
-            st.success(f"""
-                💪 Workout started, {user_name}!
+                with st.spinner("🚀 Starting your workout session..."):
+                    workout_session_id = create_workout_session(user_id_input, workout_date_input, start_time)
+                st.success(f"""
+                    💪 Workout started, {user_name}!
 
-                👉 Select an exercise  
-                👉 Add your sets  
-                👉 Track your progress
-            """)
-            st.session_state["workout_session_id"] = workout_session_id
+                    👉 Select an exercise  
+                    👉 Add your sets  
+                    👉 Track your progress
+                """)
+                st.session_state["workout_session_id"] = workout_session_id
 
     st.divider()
 
