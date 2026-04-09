@@ -5,7 +5,7 @@ import streamlit as st
 # creating a function to establish database connection
 # need only 4 arguments
 def get_connection():
-    return psycopg2.connect("postgresql://postgres.rydryqnizixrlqegivlq:gurmanjotnewpassword123@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres")
+     return psycopg2.connect(st.secrets["DB_URL"])
 
 # creating a function that creates a new user
 # will add a "sign-up" button to create the new user
