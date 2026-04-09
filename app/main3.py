@@ -646,7 +646,9 @@ with center:
 
         if total_sets == 0:
             st.warning("⚠️ No sets added.")
-            st.session_state["show_discard_options"] = True
+            # ✅ Only set to True if not already decided — don't override the False we set after discard
+            if "show_discard_options" not in st.session_state:
+                st.session_state["show_discard_options"] = True
 
             if st.session_state.get("show_discard_options"):
                 col1, col2 = st.columns(2)
@@ -662,13 +664,10 @@ with center:
                                 discard_workout(workout_session_id)
                             st.session_state["message_for_discarded_workout"] = "Workout session discarded!"
                             
-                            # reset options flag
-                            st.session_state["show_discard_options"] = False
-
                             keys_to_clear = [
                                 "workout_session_id", "workout_exercises_id",
                                 "set_number", "start_time", "end_time",
-                                "duration_minutes", "user_id",
+                                "duration_minutes", "user_id","show_discard_options"
                             ]
                             for key in keys_to_clear:
                                 st.session_state.pop(key, None)
