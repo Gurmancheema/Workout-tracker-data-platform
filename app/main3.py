@@ -162,6 +162,7 @@ def render_history_ui():
                 hist_data = fetch_historical_workout_data(related_user_id, past_workout_date_input)
 
             # ── Single pass: render rows AND collect stats ───────────────────
+            st.markdown("### 📊 Exercise Performance")
             current_exercise = None
             exercise_stats = {}
 
@@ -188,7 +189,6 @@ def render_history_ui():
 
             # ── Performance Summary ──────────────────────────────────────────
             st.markdown("## 📊 Performance Summary")
-            st.markdown("### 📊 Exercise Performance")
 
             for exercise, stats in exercise_stats.items():
                 st.markdown(f"#### 🏋️ {exercise}")
