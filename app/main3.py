@@ -653,11 +653,11 @@ with center:
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    if st.button("➕ Add Set Instead"):
+                    if st.button("➕ Add Sets"):
                         st.rerun()
 
                 with col2:
-                    if st.button("Discard Workout Instead"):
+                    if st.button("🗑️ Discard Workout Instead"):
                         if st.session_state.get("workout_session_id"):
                             with st.spinner("🗑️ Discarding workout..."):
                                 discard_workout(workout_session_id)
