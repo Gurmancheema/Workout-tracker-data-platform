@@ -666,7 +666,7 @@ with center:
                             keys_to_clear = [
                                 "workout_session_id", "workout_exercises_id",
                                 "set_number", "start_time", "end_time",
-                                "duration_minutes", "user_id","show_discard_options"
+                                "duration_minutes", "user_id","show_discard_options","confirm_finish_workout"
                             ]
                             for key in keys_to_clear:
                                 st.session_state.pop(key, None)
