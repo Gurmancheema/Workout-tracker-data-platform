@@ -101,7 +101,19 @@ INSERT INTO workout.exercises (exercise_name,muscle_group) VALUES
     ('Romanian Deadlift','Back'),
     ('Sumo Deadlift','Back'),
     ('Hyperextension','Back');
-    
+
+INSERT INTO workout.exercises (exercise_name,muscle_group) VALUES 
+('Dumbbell Bench Press','Chest'),
+('Incline Dumbbell Bench Press','Chest'),
+('Barbell Bench Press','Chest'),
+('Incline Barbell Bench Press','Chest'),
+('Decline Dumbbell Bench Press','Chest'),
+('Decline Barbell Bench Press','Chest'),
+('Flat Bench Dumbbell Fly','Chest'),
+('Incline Bench Dumbbell Fly','Chest'),
+('Fly Machine','Chest'),
+('Cable Fly','Chest');
+
 SELECT * FROM workout.exercises;
 
 -- if the SERIAL Count is out of sync, use the following code:
