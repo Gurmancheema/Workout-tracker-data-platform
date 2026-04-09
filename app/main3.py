@@ -104,7 +104,6 @@ def init_all_session_states():
     _init_state("set_number", 1)
     _init_state("success_message", None)
     _init_state("confirm_finish_workout", False)
-    _init_state("show_discard_options", False)
     _init_state("reset_inputs", False)
 
 
