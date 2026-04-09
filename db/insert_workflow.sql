@@ -86,6 +86,22 @@ INSERT INTO workout.exercises (exercise_name,muscle_group) VALUES
 INSERT INTO workout.exercises (exercise_name,muscle_group) VALUES 
     ('Treadmill','Cardio'),
     ('Elliptical','Cardio');
+
+INSERT INTO workout.exercises (exercise_name,muscle_group) VALUES 
+    ('Wide Grip Lat Pulldown','Back'),
+    ('Reverse Grip Lat Pulldown (Wide)','Back'),
+    ('Reverse Grip Lat Pulldown (Narrow)','Back'),
+    ('Neutral Grip Lat Pulldown','Back'),
+    ('Bent Over Cable Lat Pulldown','Back'),
+    ('Bent Over Barbell Row','Back'),
+    ('Seated Single Arm Row','Back'),
+    ('Standing Bench Dumbbell Row','Back'),
+    ('Bent Over T-Bar Row','Back'),
+    ('Deadlift','Back'),
+    ('Romanian Deadlift','Back'),
+    ('Sumo Deadlift','Back'),
+    ('Hyperextension','Back');
+    
 SELECT * FROM workout.exercises;
 
 -- if the SERIAL Count is out of sync, use the following code:
