@@ -363,7 +363,7 @@ if (
         st.session_state.get("duration"),
     )
     st.session_state["workout_session_id"] = workout_session_id
-    st.session_state["show_success_message"] = True
+    #st.session_state["show_success_message"] = True
 
 
 # ============================================================
@@ -375,10 +375,10 @@ with center:
     st.caption("Track your workouts efficiently")
     st.markdown("### 🏁 Start Workout")
 
-with center:
-    if st.session_state["show_success_message"]:
-        st.success("✅ Workout session created successfully! Go ahead and add Exercises and Sets")
-        st.session_state["show_success_message"] = False
+#with center:
+  #  if st.session_state["show_success_message"]:
+      #  st.success("✅ Workout session created successfully! Go ahead and add Exercises and Sets")
+       # st.session_state["show_success_message"] = False
 
     col1, col2, col3 = st.columns([2, 2, 1.5])
     col1.markdown("**User**")
