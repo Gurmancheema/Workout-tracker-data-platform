@@ -280,8 +280,10 @@ def render_past_workout_ui():
     with col2:
         if st.button("📝 Log Workout Session", type="primary", use_container_width=True):
             if not user_name:
-                st.error("⚠️ Username cannot be null")
+                st.error("⚠️ Please enter your username")
                 st.stop()
+            if not estimated_duration:
+                st.error("⚠️ Please enter an estimated duration of workout in minutes")
 
             with st.spinner("🔍 Verifying user..."):
                 user_id_input = get_user_id(user_name)
@@ -409,7 +411,7 @@ workout_session_id = st.session_state.get("workout_session_id")
 with center:
     if st.button("🚀 Start Workout", type="primary"):
         if not user_name:
-            st.error("⚠️ Username cannot be null")
+            st.error("⚠️ Please enter your username")
             st.stop()
 
         with st.spinner("🔍 Verifying user..."):
