@@ -159,6 +159,10 @@ def render_history_ui():
 
             with st.spinner("📊 Loading workout data..."):
                 hist_data = fetch_historical_workout_data(related_user_id, past_workout_date_input)
+                # ✅ Check before trying to loop over it
+                if not hist_data:
+                    st.info(f"📭 No workout found for **{user_name_input}** on **{past_workout_date_input.strftime('%d %b %Y')}**")
+                    return
 
             # ── Single pass: render rows AND collect stats ───────────────────
             st.markdown("### 📊 Exercise Performance")
