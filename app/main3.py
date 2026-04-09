@@ -394,16 +394,19 @@ today = datetime.now()
 min_date = today - timedelta(days=7)
 
 with center:
-    with col1:
-        user_name = st.text_input("Username", key="user_name", label_visibility="collapsed")
-    with col2:
-        workout_date_input = st.date_input(
-            "Workout Date", key="workout_date",
-            min_value=min_date, max_value=date.today(), label_visibility="collapsed"
-        )
-    with col3:
-        current_time = datetime.now(IST).strftime("%H:%M:%S")
-        st.markdown(f"**🕒 {current_time}**")
+    if workout_session_id:
+        st.info("✅ Workout session active — add your exercises and sets below.")
+    else:
+        with col1:
+            user_name = st.text_input("Username", key="user_name", label_visibility="collapsed")
+        with col2:
+            workout_date_input = st.date_input(
+                "Workout Date", key="workout_date",
+                min_value=min_date, max_value=date.today(), label_visibility="collapsed"
+            )
+        with col3:
+            current_time = datetime.now(IST).strftime("%H:%M:%S")
+            st.markdown(f"**🕒 {current_time}**")
 
 workout_session_id = st.session_state.get("workout_session_id")
 
