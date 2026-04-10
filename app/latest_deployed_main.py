@@ -11,6 +11,21 @@
 #   6. render_history_ui loops over hist_data only once (was twice)
 #   7. get_set_number() / get_whole_workout_session() guarded so they
 #      never run when their prerequisite IDs are None
+#
+# NEW — Session Resume:
+#   8. try_resume_session() restores an open workout from the DB on page refresh
+#      so the user never loses their active session.
+#
+# PERF FIXES (this version):
+#   9.  cached_get_whole_workout_session.clear() added after ➕ Add Set
+#       — was missing, causing progress section to show stale data
+#  10.  cached_get_whole_workout_session.clear() added after ➕ Add Exercise
+#       — new exercise header now appears instantly
+#  11.  try_resume_session: get_user_id only called when name length >= 3
+#       to avoid a DB hit on every single keystroke
+#  12.  _resume_checked_for cleared on both finish AND discard paths
+#  13.  workout_session_id always read from session_state at point of use
+#       in the finish block — eliminates stale local-variable shadowing
 # ============================================================
 
 import streamlit as st
@@ -39,6 +54,10 @@ from db import (
     discard_workout,
     delete_set,
     fetch_historical_workout_data,
+    # ── needed for session resume ────────────────────────────────────────────
+    get_active_session,
+    get_last_workout_exercise,
+    get_workout_exercise_id,
 )
 
 print(st.__version__)
@@ -68,7 +87,7 @@ def cached_get_set_number(workout_exercises_id):
     return get_set_number(workout_exercises_id)
 
 
-@st.cache_data(ttl=2)           # live session data — short TTL
+@st.cache_data(ttl=2)            # live session data — short TTL
 def cached_get_whole_workout_session(workout_session_id):
     if workout_session_id is None:
         return []
@@ -80,6 +99,13 @@ def cached_get_total_sets(workout_session_id):
     if workout_session_id is None:
         return 0
     return get_total_sets_per_workout_session(workout_session_id)
+
+
+# ── Helper: clear all live-session caches in one call ────────────────────────
+def clear_session_caches():
+    cached_get_whole_workout_session.clear()
+    cached_get_set_number.clear()
+    cached_get_total_sets.clear()
 
 
 # ============================================================
@@ -105,9 +131,59 @@ def init_all_session_states():
     _init_state("success_message", None)
     _init_state("confirm_finish_workout", False)
     _init_state("reset_inputs", False)
+    _init_state("session_resumed", False)   # tracks if we already showed the resume toast
 
 
 init_all_session_states()
+
+
+# ============================================================
+# SESSION RESUME
+# ============================================================
+
+def try_resume_session(user_name: str):
+    """
+    Called whenever the user types their name on the main screen.
+    If they have an open (unfinished) workout session in the DB for today,
+    restore all the relevant IDs back into session_state so the UI
+    picks up exactly where it left off — even after a hard refresh.
+
+    FIX: only fires the DB lookup once name is >= 3 chars to avoid
+    hammering the DB on every individual keystroke.
+    """
+    # Already have an active session in state — nothing to do.
+    if st.session_state.get("workout_session_id"):
+        return
+
+    # Don't bother querying until the name is long enough to be real.
+    if len(user_name) < 3:
+        return
+
+    # Avoid re-running the DB lookup on every keystroke once we've
+    # already confirmed there is nothing to resume for this name.
+    if st.session_state.get("_resume_checked_for") == user_name:
+        return
+
+    user_id = get_user_id(user_name)
+    st.session_state["_resume_checked_for"] = user_name   # memoize the check
+
+    if not user_id:
+        return
+
+    result = get_active_session(user_id)
+    if not result:
+        return
+
+    workout_session_id, start_time = result
+    st.session_state["workout_session_id"] = workout_session_id
+    st.session_state["start_time"] = start_time
+    st.session_state["user_id_input"] = user_id
+    st.session_state["session_resumed"] = True
+
+    # Restore the last selected exercise so "Add Set" still works immediately.
+    last_we_id = get_last_workout_exercise(workout_session_id)
+    if last_we_id:
+        st.session_state["workout_exercises_id"] = last_we_id
 
 
 # ============================================================
@@ -159,7 +235,6 @@ def render_history_ui():
 
             with st.spinner("📊 Loading workout data..."):
                 hist_data = fetch_historical_workout_data(related_user_id, past_workout_date_input)
-                # ✅ Check before trying to loop over it
                 if not hist_data:
                     st.info(f"📭 No workout found for **{user_name_input}** on **{past_workout_date_input.strftime('%d %b %Y')}**")
                     return
@@ -172,7 +247,6 @@ def render_history_ui():
             for row in hist_data:
                 exercise_name, muscle_group, exercise_order, exercise_id, set_number, reps, weight = row
 
-                # Render exercise header when exercise changes
                 if exercise_name != current_exercise:
                     st.markdown("---")
                     st.markdown(f"### {exercise_order}. 💪 {muscle_group} - {exercise_name}")
@@ -180,7 +254,6 @@ def render_history_ui():
 
                 st.write(f"Set {set_number}  →  {reps} reps | {weight} kg")
 
-                # Accumulate stats in same loop (no second pass needed)
                 if exercise_name not in exercise_stats:
                     exercise_stats[exercise_name] = {"max_weight": 0, "max_reps": 0}
                 exercise_stats[exercise_name]["max_weight"] = max(
@@ -357,8 +430,8 @@ elif st.session_state["page"] == "main":
 if (
     st.session_state.get("start_time")
     and st.session_state.get("end_time")
-    and not st.session_state.get("workout_session_id")):
-
+    and not st.session_state.get("workout_session_id")
+):
     workout_session_id = create_workout_session(
         st.session_state.get("user_id_input"),
         st.session_state.get("workout_date"),
@@ -367,7 +440,6 @@ if (
         st.session_state.get("duration"),
     )
     st.session_state["workout_session_id"] = workout_session_id
-    #st.session_state["show_success_message"] = True
 
 
 # ============================================================
@@ -378,11 +450,6 @@ with center:
     st.markdown("## 💪 Workout Tracker")
     st.caption("Track your workouts efficiently")
     st.markdown("### 🏁 Start Workout")
-
-#with center:
-  #  if st.session_state["show_success_message"]:
-      #  st.success("✅ Workout session created successfully! Go ahead and add Exercises and Sets")
-       # st.session_state["show_success_message"] = False
 
     col1, col2, col3 = st.columns([2, 2, 1.5])
     col1.markdown("**User**")
@@ -401,10 +468,23 @@ min_date = today - timedelta(days=7)
 
 with center:
     if st.session_state.get("workout_session_id"):
-        st.info("✅ Workout session active — add your exercises and sets below.")
+        # Show a banner when we just restored a session after refresh
+        if st.session_state.get("session_resumed"):
+            st.info("🔄 **Session restored!** Your workout is right where you left it.")
+            st.session_state["session_resumed"] = False
+        else:
+            st.info("✅ Workout session active — add your exercises and sets below.")
     else:
         with col1:
             user_name = st.text_input("Username", key="user_name", label_visibility="collapsed")
+
+            # Attempt to resume as soon as a name is typed.
+            # FIX: guarded to len >= 3 so DB is not hit on every single keystroke.
+            if user_name:
+                try_resume_session(user_name)
+                if st.session_state.get("workout_session_id"):
+                    st.rerun()
+
         with col2:
             workout_date_input = st.date_input(
                 "Workout Date", key="workout_date",
@@ -416,7 +496,7 @@ with center:
 
         workout_session_id = st.session_state.get("workout_session_id")
 
-    # ── Start Workout Button ─────────────────────────────────────────────────────
+    # ── Start Workout Button ──────────────────────────────────────────────────
         with center:
             if st.button("🚀 Start Workout", type="primary"):
                 if not user_name:
@@ -432,8 +512,22 @@ with center:
                 with st.spinner("📅 Checking for existing session..."):
                     existing_session = check_existing_session(user_id_input, workout_date_input)
                 if existing_session:
-                    st.error("⚠️ You already have a workout logged for this date.")
-                    st.stop()
+                    # Check if it's still open (unfinished) — if so, resume it instead of blocking
+                    active = get_active_session(user_id_input)
+                    if active:
+                        session_id, start_time = active
+                        st.session_state["workout_session_id"] = session_id
+                        st.session_state["start_time"] = start_time
+                        st.session_state["user_id_input"] = user_id_input
+                        last_we_id = get_last_workout_exercise(session_id)
+                        if last_we_id:
+                            st.session_state["workout_exercises_id"] = last_we_id
+                        st.session_state["session_resumed"] = True
+                        st.rerun()
+                    else:
+                        # Session exists but is already finished — block as before
+                        st.error("⚠️ You already have a workout logged for this date.")
+                        st.stop()
 
                 _init_state("start_time", datetime.now())
                 start_time = st.session_state["start_time"]
@@ -505,21 +599,38 @@ with center:
             st.warning("Please select an exercise")
             st.stop()
 
-        exercise_order = get_exercises_order(workout_session_id)
-        try:
-            with st.spinner(f"➕ Adding {selected_exercise['display']}..."):
-                workout_exercises_id = create_workout_exercises(
-                workout_session_id, derived_exercise_id, exercise_order
-            )
-            st.success(f"""
-                ✅ **{selected_exercise["display"]} added!**
+        # Check if this exercise already exists in the session (e.g. after resume)
+        existing_we_id = get_workout_exercise_id(workout_session_id, derived_exercise_id)
 
-                👉 Now add your sets below  
-                👉 Track reps & weight
+        if existing_we_id:
+            # Just switch focus to it — no insert needed
+            st.session_state["workout_exercises_id"] = existing_we_id
+            cached_get_set_number.clear()
+            # FIX: bust progress cache so the resumed exercise row appears immediately
+            cached_get_whole_workout_session.clear()
+            st.success(f"""
+                🔄 **{selected_exercise["display"]} resumed!**
+
+                👉 Continue adding your sets below
             """)
-            st.session_state["workout_exercises_id"] = workout_exercises_id
-        except errors.UniqueViolation:
-            st.warning("⚠️ This exercise is already added to the workout!")
+        else:
+            exercise_order = get_exercises_order(workout_session_id)
+            try:
+                with st.spinner(f"➕ Adding {selected_exercise['display']}..."):
+                    workout_exercises_id = create_workout_exercises(
+                        workout_session_id, derived_exercise_id, exercise_order
+                    )
+                # FIX: bust progress cache so new exercise header appears immediately
+                cached_get_whole_workout_session.clear()
+                st.success(f"""
+                    ✅ **{selected_exercise["display"]} added!**
+
+                    👉 Now add your sets below  
+                    👉 Track reps & weight
+                """)
+                st.session_state["workout_exercises_id"] = workout_exercises_id
+            except errors.UniqueViolation:
+                st.warning("⚠️ This exercise is already added to the workout!")
 
 
 # ============================================================
@@ -575,8 +686,9 @@ with center:
         st.session_state["success_message"] = f"Set {set_number} added!"
         st.session_state["reset_inputs"] = True
 
-        # Invalidate cached set_number so next rerun fetches fresh count
+        # FIX: bust BOTH caches so the new set row appears in progress immediately
         cached_get_set_number.clear()
+        cached_get_whole_workout_session.clear()   # ← was missing in deployed_main
 
         st.rerun()
 
@@ -619,7 +731,7 @@ if workout_session_id:
                 if st.button("🗑️", key=f"delete_{set_id}"):
                     with st.spinner("🗑️ Deleting set..."):
                         delete_set(set_id)
-                    # Invalidate session cache after deletion
+                    # Bust both caches after deletion
                     cached_get_whole_workout_session.clear()
                     cached_get_set_number.clear()
                     st.rerun()
@@ -644,12 +756,15 @@ with center:
         st.session_state["confirm_finish_workout"] = True
 
     if st.session_state.get("confirm_finish_workout"):
+        # FIX: always read workout_session_id fresh from state here —
+        # the local variable above may be stale if state changed this run.
+        workout_session_id = st.session_state.get("workout_session_id")
+
         # Cached total — avoids redundant query
         total_sets = cached_get_total_sets(workout_session_id)
 
         if total_sets == 0:
             st.warning("⚠️ No sets added.")
-            # ✅ Only set to True if not already decided — don't override the False we set after discard
             if "show_discard_options" not in st.session_state:
                 st.session_state["show_discard_options"] = True
 
@@ -666,19 +781,17 @@ with center:
                             with st.spinner("🗑️ Discarding workout..."):
                                 discard_workout(workout_session_id)
                             st.session_state["message_for_discarded_workout"] = "Workout session discarded!"
-                            
+
                             keys_to_clear = [
                                 "workout_session_id", "workout_exercises_id",
                                 "set_number", "start_time", "end_time",
-                                "duration_minutes", "user_id","show_discard_options","confirm_finish_workout"
+                                "duration_minutes", "user_id", "show_discard_options",
+                                "confirm_finish_workout", "_resume_checked_for",
                             ]
                             for key in keys_to_clear:
                                 st.session_state.pop(key, None)
 
-                            # Clear relevant caches
-                            cached_get_whole_workout_session.clear()
-                            cached_get_total_sets.clear()
-
+                            clear_session_caches()
                             st.session_state["reset_form"] = True
                             st.rerun()
                         else:
@@ -700,14 +813,11 @@ with center:
                 label = "💾 Save Workout" if existing_end_time else "🏁 Finish Workout"
 
                 if st.button(label):
-                    keys_to_clear = [
-                        "workout_session_id", "workout_exercises_id",
-                        "set_number", "start_time", "end_time", "duration_minutes",
-                    ]
-
+                    # FIX: read all values fresh from state at the point of use —
+                    # never rely on a local variable that was set earlier in the run.
                     workout_session_id = st.session_state.get("workout_session_id")
-                    start_time = st.session_state.get("start_time")
-                    existing_end_time = st.session_state.get("end_time")
+                    start_time         = st.session_state.get("start_time")
+                    existing_end_time  = st.session_state.get("end_time")
                     estimated_duration = st.session_state.get("duration_minutes")
 
                     if not existing_end_time:
@@ -719,14 +829,15 @@ with center:
                         with st.spinner("💾 Saving past workout..."):
                             update_workout_sessions(existing_end_time, estimated_duration, workout_session_id)
 
+                    keys_to_clear = [
+                        "workout_session_id", "workout_exercises_id",
+                        "set_number", "start_time", "end_time", "duration_minutes",
+                        "_resume_checked_for",
+                    ]
                     for key in keys_to_clear:
                         st.session_state.pop(key, None)
 
-                    # Clear all workout-related caches on finish
-                    cached_get_whole_workout_session.clear()
-                    cached_get_total_sets.clear()
-                    cached_get_set_number.clear()
-
+                    clear_session_caches()
                     st.session_state["reset_form"] = True
                     st.session_state["confirm_finish_workout"] = False
                     st.session_state["workout_finished"] = True

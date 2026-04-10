@@ -2,10 +2,13 @@
 # Psycopg2-binary is necessary package to enable communication between Python & Postgresql
 import psycopg2
 import streamlit as st
+from datetime import datetime,date
 # creating a function to establish database connection
 # need only 4 arguments
 def get_connection():
-     return psycopg2.connect(st.secrets["DB_URL"])
+     conn = psycopg2.connect(st.secrets["DB_URL"])
+     conn.autocommit = True
+     return conn
 
 # creating a function that creates a new user
 # will add a "sign-up" button to create the new user
@@ -55,7 +58,52 @@ def check_existing_session(user_id,workout_date):
     conn.close()
 
     return resulting_workout_session_id
+def get_active_session(user_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    #Returns (workout_session_id, start_time) for today's unfinished session, or None
+    today = date.today()
+    cur.execute("""
+        SELECT workout_session_id, start_time
+        FROM workout.workout_sessions
+        WHERE user_id = %s
+          AND DATE(start_time) = %s
+          AND end_time IS NULL
+        LIMIT 1
+    """, (user_id, today))
+    resulting_session = cur.fetchone()
+    cur.close()
+    conn.close()
+    return resulting_session
 
+def get_last_workout_exercise(workout_session_id):
+    #Returns the workout_exercises_id most recently added in a session
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT exercise_id FROM workout.workout_exercises
+        WHERE workout_session_id = %s
+        ORDER BY exercise_order DESC
+        LIMIT 1
+    """, (workout_session_id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return row[0] if row else None
+
+def get_workout_exercise_id(workout_session_id, exercise_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT workout_exercises_id FROM workout.workout_exercises
+        WHERE workout_session_id = %s AND exercise_id = %s
+        LIMIT 1
+    """, (workout_session_id, exercise_id))
+    result = cur.fetchone()
+    cur.close()
+    conn.close()
+    return result[0] if result else None
+    
 # creating a function that fetches the "user_id", "workout_date" and "workout_duration" from user input
 # inserts theese values into the "workout_sessions" table
 # then returns the "workout_session_id" & further closes the DB connection to avoid leaks
@@ -214,8 +262,9 @@ def get_whole_workout_session(workout_session_id):
                 WHERE we.workout_session_id = %s;""",(workout_session_id,))
     
     resulting_rows = cur.fetchall()
-    conn.close()
     cur.close()
+    conn.close()
+
 
     return resulting_rows
 
