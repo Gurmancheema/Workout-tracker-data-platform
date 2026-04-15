@@ -190,22 +190,9 @@ streamlit run app/main.py
 > [https://personal--workout-tracker.streamlit.app/]
 
 ---
+## 📸 Application Preview
+![App Screenshot](design/webapp-page.png)
 
-## 🏷️ GitHub Topics (for better reach)
-
-Add these tags to your repository:
-
-```
-data-engineering
-postgresql
-streamlit
-supabase
-python
-etl
-data-platform
-analytics
-cloud
-```
 
 ---
 
