@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<project name="Workout_tracker_data_platform" database="PostgreSQL" id="d376bf27-1605-4900-9aec-524368ab8f12" >
+	<schema name="workout_tracker" >
+		<table name="exercises" prior="exercis" >
+			<column name="exercise_id" type="integer" mandatory="y" />
+			<column name="exercise_name" type="text" mandatory="y" />
+			<column name="muscle_group" prior="body_part" type="text" mandatory="y" />
+			<index name="pk_exercises" unique="PRIMARY_KEY" >
+				<column name="exercise_id" />
+			</index>
+		</table>
+		<table name="exercises_sets" prior="exercises_set" >
+			<column name="set_id" type="integer" mandatory="y" />
+			<column name="workout_exercise_id" type="integer" mandatory="y" />
+			<column name="set_number" type="integer" mandatory="y" />
+			<column name="reps" type="integer" mandatory="y" />
+			<column name="weight" type="integer" mandatory="y" />
+			<index name="pk_exercises_sets" unique="PRIMARY_KEY" >
+				<column name="set_id" />
+			</index>
+			<index name="unq_exercises_sets_workout_exercise_id" unique="UNIQUE_KEY" >
+				<column name="workout_exercise_id" />
+			</index>
+		</table>
+		<table name="users" prior="tbl" >
+			<column name="user_id" type="integer" mandatory="y" />
+			<column name="email_id" type="integer" mandatory="y" />
+			<column name="name" type="text" mandatory="y" />
+			<index name="pk_users" unique="PRIMARY_KEY" >
+				<column name="user_id" />
+			</index>
+		</table>
+		<table name="workout_exercises" prior="exercises_order" >
+			<column name="workout_exercise_id" type="integer" mandatory="y" />
+			<column name="workout_id" type="integer" mandatory="y" />
+			<column name="exercise_id" type="integer" mandatory="y" />
+			<column name="exercise_order" type="text" mandatory="y" />
+			<index name="pk_workout_exercises" unique="NORMAL" >
+				<column name="workout_exercise_id" />
+			</index>
+			<index name="unq_workout_exercises_exercise_id" unique="NORMAL" >
+				<column name="exercise_id" />
+			</index>
+			<index name="unq_workout_exercises_workout_id" unique="NORMAL" >
+				<column name="workout_id" />
+			</index>
+			<index name="pk_workout_exercises_0" unique="PRIMARY_KEY" >
+				<column name="workout_exercise_id" />
+			</index>
+			<fk name="fk_workout_exercises_workout_sessions" to_schema="workout_tracker" to_table="workout_sessions" >
+				<fk_column name="workout_id" pk="workout_id" />
+			</fk>
+			<fk name="fk_workout_exercises_exercises" to_schema="workout_tracker" to_table="exercises" >
+				<fk_column name="exercise_id" pk="exercise_id" />
+			</fk>
+			<fk name="fk_workout_exercises_exercises_sets" to_schema="workout_tracker" to_table="exercises_sets" >
+				<fk_column name="workout_exercise_id" pk="workout_exercise_id" />
+			</fk>
+		</table>
+		<table name="workout_sessions" prior="workout_session" >
+			<column name="workout_id" type="integer" mandatory="y" />
+			<column name="user_id" type="integer" mandatory="y" >
+				<comment><![CDATA[will be FK to users table]]></comment>
+			</column>
+			<column name="workout_date" type="date" mandatory="y" />
+			<column name="duration_minutes" type="integer[]" mandatory="y" />
+			<index name="pk_workout_sessions" unique="PRIMARY_KEY" >
+				<column name="workout_id" />
+			</index>
+			<index name="unq_workout_sessions_user_id" unique="NORMAL" >
+				<column name="user_id" />
+			</index>
+			<fk name="fk_workout_sessions_users" to_schema="workout_tracker" to_table="users" options="" >
+				<fk_column name="user_id" pk="user_id" />
+			</fk>
+		</table>
+	</schema>
+	<diagram_group name="Default" id="7659d7e1-6038-461e-baf1-2f538a988714" >
+		<diagram name="ER diagram for workout tracker" id="4c89a579-8e60-4af7-8799-2e7f2bc61621" show_relation="columns" >
+			<entity schema="workout_tracker" name="exercises" color="C1D8EE" x="589" y="57" />
+			<entity schema="workout_tracker" name="exercises_sets" color="C1D8EE" x="665" y="304" />
+			<entity schema="workout_tracker" name="users" color="C1D8EE" x="57" y="209" />
+			<entity schema="workout_tracker" name="workout_exercises" color="C1D8EE" x="893" y="76" />
+			<entity schema="workout_tracker" name="workout_sessions" color="C1D8EE" x="304" y="228" />
+		</diagram>
+	</diagram_group>
+</project>
