@@ -346,3 +346,31 @@ def fetch_historical_workout_data(user_id,workout_date):
     conn.close()
 
     return resulting_historical_data
+
+def fetch_workouts_by_muscle_group(user_id, muscle_group):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT e.exercise_name,
+               e.muscle_group,
+               ws.workout_date,
+               es.set_number,
+               es.reps,
+               es.weight
+        FROM workout.workout_sessions ws
+            JOIN workout.workout_exercises we
+                ON ws.workout_session_id = we.workout_session_id
+            JOIN workout.exercises e
+                ON e.exercise_id = we.exercise_id
+            JOIN workout.exercises_sets es
+                ON es.workout_exercises_id = we.workout_exercises_id
+        WHERE ws.user_id = %s
+          AND LOWER(e.muscle_group) = LOWER(%s)
+        ORDER BY ws.workout_date DESC, we.exercise_order;
+    """, (user_id, muscle_group))
+
+    result = cur.fetchall()
+    cur.close()
+    conn.close()
+    return result

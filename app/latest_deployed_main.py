@@ -54,6 +54,7 @@ from db import (
     discard_workout,
     delete_set,
     fetch_historical_workout_data,
+    fetch_workouts_by_muscle_group,
     # ── needed for session resume ────────────────────────────────────────────
     get_active_session,
     get_last_workout_exercise,
@@ -221,57 +222,102 @@ def render_history_ui():
         st.subheader("Workout History")
 
         user_name_input = st.text_input("Enter username", key="history_username")
-        past_workout_date_input = st.date_input(
-            "Select workout day", key="history_date", max_value=date.today()
+
+        # ── Fetch mode toggle ────────────────────────────────────────────────
+        fetch_mode = st.radio(
+            "Fetch by", ["By Date", "By Muscle Group"],
+            horizontal=True, key="history_fetch_mode"
         )
 
-        if st.button("Fetch Workout"):
-            with st.spinner("🔍 Fetching your workout history..."):
-                related_user_id = get_user_id(user_name_input)
+        if fetch_mode == "By Date":
+            past_workout_date_input = st.date_input(
+                "Select workout day", key="history_date", max_value=date.today()
+            )
 
-            if not related_user_id:
-                st.error("⚠️ User not found. Please sign up first.")
-                return
-
-            with st.spinner("📊 Loading workout data..."):
-                hist_data = fetch_historical_workout_data(related_user_id, past_workout_date_input)
-                if not hist_data:
-                    st.info(f"📭 No workout found for **{user_name_input}** on **{past_workout_date_input.strftime('%d %b %Y')}**")
+            if st.button("Fetch Workout"):
+                with st.spinner("🔍 Fetching your workout history..."):
+                    related_user_id = get_user_id(user_name_input)
+                if not related_user_id:
+                    st.error("⚠️ User not found. Please sign up first.")
                     return
 
-            # ── Single pass: render rows AND collect stats ───────────────────
-            st.markdown("### 📊 Exercise Performance")
-            current_exercise = None
-            exercise_stats = {}
+                with st.spinner("📊 Loading workout data..."):
+                    hist_data = fetch_historical_workout_data(related_user_id, past_workout_date_input)
+                    if not hist_data:
+                        st.info(f"📭 No workout found for **{user_name_input}** on **{past_workout_date_input.strftime('%d %b %Y')}**")
+                        return
 
-            for row in hist_data:
-                exercise_name, muscle_group, exercise_order, exercise_id, set_number, reps, weight = row
+                st.markdown("### 📊 Exercise Performance")
+                current_exercise = None
+                exercise_stats = {}
 
-                if exercise_name != current_exercise:
-                    st.markdown("---")
-                    st.markdown(f"### {exercise_order}. 💪 {muscle_group} - {exercise_name}")
-                    current_exercise = exercise_name
+                for row in hist_data:
+                    exercise_name, muscle_group, exercise_order, exercise_id, set_number, reps, weight = row
+                    if exercise_name != current_exercise:
+                        st.markdown("---")
+                        st.markdown(f"### {exercise_order}. 💪 {muscle_group} - {exercise_name}")
+                        current_exercise = exercise_name
+                    st.write(f"Set {set_number}  →  {reps} reps | {weight} kg")
+                    if exercise_name not in exercise_stats:
+                        exercise_stats[exercise_name] = {"max_weight": 0, "max_reps": 0}
+                    exercise_stats[exercise_name]["max_weight"] = max(exercise_stats[exercise_name]["max_weight"], weight)
+                    exercise_stats[exercise_name]["max_reps"] = max(exercise_stats[exercise_name]["max_reps"], reps)
 
-                st.write(f"Set {set_number}  →  {reps} reps | {weight} kg")
+                st.markdown("## 📊 Performance Summary")
+                for exercise, stats in exercise_stats.items():
+                    st.markdown(f"#### 🏋️ {exercise}")
+                    col1, col2 = st.columns(2)
+                    col1.metric("**💪 Max Weight**", f"{stats['max_weight']} kg")
+                    col2.metric("**🔁 Max Reps**", f"{stats['max_reps']}")
+                    st.divider()
 
-                if exercise_name not in exercise_stats:
-                    exercise_stats[exercise_name] = {"max_weight": 0, "max_reps": 0}
-                exercise_stats[exercise_name]["max_weight"] = max(
-                    exercise_stats[exercise_name]["max_weight"], weight
-                )
-                exercise_stats[exercise_name]["max_reps"] = max(
-                    exercise_stats[exercise_name]["max_reps"], reps
-                )
+        else:  # ── By Muscle Group ───────────────────────────────────────────
+            all_exercises = cached_get_all_exercises()
+            muscle_groups = sorted(set(ex[2] for ex in all_exercises))
+            selected_muscle = st.selectbox(
+                "Select Muscle Group", muscle_groups, key="history_muscle_group"
+            )
 
-            # ── Performance Summary ──────────────────────────────────────────
-            st.markdown("## 📊 Performance Summary")
+            if st.button("Fetch Workout"):
+                with st.spinner("🔍 Verifying user..."):
+                    related_user_id = get_user_id(user_name_input)
+                if not related_user_id:
+                    st.error("⚠️ User not found. Please sign up first.")
+                    return
 
-            for exercise, stats in exercise_stats.items():
-                st.markdown(f"#### 🏋️ {exercise}")
-                col1, col2 = st.columns(2)
-                col1.metric("**💪 Max Weight**", f"{stats['max_weight']} kg")
-                col2.metric("**🔁 Max Reps**", f"{stats['max_reps']}")
-                st.divider()
+                with st.spinner(f"📊 Loading {selected_muscle} workouts..."):
+                    muscle_data = fetch_workouts_by_muscle_group(related_user_id, selected_muscle)
+                if not muscle_data:
+                    st.info(f"📭 No **{selected_muscle}** workouts found for **{user_name_input}**")
+                    return
+
+                st.markdown(f"### 💪 {selected_muscle} — All Sessions")
+
+                current_date = None
+                exercise_stats = {}
+
+                for row in muscle_data:
+                    exercise_name, muscle_group, workout_date, set_number, reps, weight = row
+
+                    if workout_date != current_date:
+                        st.markdown("---")
+                        st.markdown(f"#### 📅 {workout_date.strftime('%d %b %Y')}")
+                        current_date = workout_date
+
+                    st.write(f"**{exercise_name}** — Set {set_number}  →  {reps} reps | {weight} kg")
+
+                    if exercise_name not in exercise_stats:
+                        exercise_stats[exercise_name] = {"max_weight": 0, "max_reps": 0}
+                    exercise_stats[exercise_name]["max_weight"] = max(exercise_stats[exercise_name]["max_weight"], weight)
+                    exercise_stats[exercise_name]["max_reps"] = max(exercise_stats[exercise_name]["max_reps"], reps)
+
+                st.markdown("## 📊 Performance Summary")
+                for exercise, stats in exercise_stats.items():
+                    st.markdown(f"#### 🏋️ {exercise}")
+                    col1, col2 = st.columns(2)
+                    col1.metric("**💪 Max Weight**", f"{stats['max_weight']} kg")
+                    col2.metric("**🔁 Max Reps**", f"{stats['max_reps']}")
+                    st.divider()
 
         if st.button("⬅ Back"):
             st.session_state["show_history"] = False
