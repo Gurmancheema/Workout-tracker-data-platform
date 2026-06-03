@@ -123,3 +123,27 @@ SELECT setval(
 );
 SELECT MAX(exercise_id) FROM workout.exercises;
 SELECT nextval('workout.exercises_exercise_id_seq');
+
+--Updated exercise master data:
+-- Added new exercise entries
+-- Removed deprecated exercises
+-- Standardized exercise names and descriptions
+
+INSERT INTO workout.exercises(exercise_name,muscle_group) VALUES
+    ('Standing Cable Curls','Biceps'),
+    ('Reverse Cable Curls','Biceps'),
+    ('Dumbbell Preacher Curl','Biceps'),
+    ('EZ-Bar Preacher Curls','Biceps'),
+    ('Straight Bar Preacher Curls','Biceps'),
+    ('Incline Bench Dumbbell Curl','Biceps'),
+    ('EZ-Bar Skull Crusher','Triceps'),
+    ('Narrow Grip Bench Press','Triceps'),
+    ('Straight Bar Cable Pushdown','Triceps'),
+    ('EZ-Bar Cable Pushdown','Triceps'),
+    ('Rope Pushdown','Triceps'),
+    ('Seated Dumbbell Overhead Extension','Triceps'),
+    ('Rope Overhead Extension','Triceps'),
+    ('EZ-Bar Cable Overhead Extension','Triceps'),
+    ('Straight Bar Cable Overhead Extension','Triceps'),
+    ('Tricep Dips','Triceps'),
+    ('Dumbbell Kickbacks','Triceps');
